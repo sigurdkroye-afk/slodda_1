@@ -48,6 +48,6 @@ slodda_1/
 
 ## Team
 
-- [Navn 1]
-- [Navn 2]
-- [Navn 3]
+- Sigurd (tyngden)
+- Jostein (slaktern)
+- Isak (grøten)
