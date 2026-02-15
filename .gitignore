@@ -1,0 +1,16 @@
+build/
+install/
+log/
+.colcon/
+__pycache__/
+*.pyc
+*.egg-info/
+venv/
+.vscode/
+.idea/
+*.swp
+*~
+.gazebo/
+.DS_Store
+*.stl
+*.dae
