@@ -1,0 +1,310 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="slodda">
+
+  <!-- Properties -->
+  <xacro:property name="chassis_length" value="0.250"/>
+  <xacro:property name="chassis_width" value="0.280"/>
+  <xacro:property name="chassis_height" value="0.122"/>
+  <xacro:property name="chassis_mass" value="2.5"/>
+  
+  <xacro:property name="wheel_radius" value="0.045"/>
+  <xacro:property name="wheel_width" value="0.04"/>
+  <xacro:property name="track_separation" value="0.280"/>
+  
+  <xacro:property name="ir_sensor_range_min" value="0.04"/>
+  <xacro:property name="ir_sensor_range_max" value="0.30"/>
+
+  <!-- Materials -->
+  <material name="orange">
+    <color rgba="0.8 0.4 0.1 1.0"/>
+  </material>
+  
+  <material name="blue">
+    <color rgba="0.2 0.4 0.8 1.0"/>
+  </material>
+  
+  <material name="grey">
+    <color rgba="0.5 0.5 0.5 1.0"/>
+  </material>
+
+  <!-- Base link (chassis with mesh) -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <mesh filename="package://slodda_description/meshes/chassis.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="orange"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0.061" rpy="0 0 0"/>
+      <geometry>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="${chassis_mass}"/>
+      <origin xyz="0 0 0.061" rpy="0 0 0"/>
+      <inertia ixx="0.052" ixy="0.0" ixz="0.0" 
+               iyy="0.046" iyz="0.0" 
+               izz="0.078"/>
+    </inertial>
+  </link>
+
+  <!-- Left track (simplified as single cylinder) -->
+  <link name="left_track">
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${chassis_length}"/>
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${chassis_length}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <inertia ixx="0.002" ixy="0.0" ixz="0.0" 
+               iyy="0.002" iyz="0.0" 
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="left_track_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="left_track"/>
+    <origin xyz="0 ${track_separation/2} ${wheel_radius}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- Right track (simplified as single cylinder) -->
+  <link name="right_track">
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${chassis_length}"/>
+      </geometry>
+      <material name="blue"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder radius="${wheel_radius}" length="${chassis_length}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <inertia ixx="0.002" ixy="0.0" ixz="0.0" 
+               iyy="0.002" iyz="0.0" 
+               izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="right_track_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="right_track"/>
+    <origin xyz="0 ${-track_separation/2} ${wheel_radius}" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
+
+  <!-- IR Sensor - Front Left -->
+  <link name="ir_front_left">
+    <visual>
+      <geometry>
+        <box size="0.02 0.01 0.01"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.02 0.01 0.01"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.01"/>
+      <inertia ixx="0.00001" ixy="0.0" ixz="0.0" 
+               iyy="0.00001" iyz="0.0" 
+               izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <joint name="ir_front_left_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="ir_front_left"/>
+    <origin xyz="0.125 0.08 0.08" rpy="0 0 0.3"/>
+  </joint>
+
+  <!-- IR Sensor - Front Center -->
+  <link name="ir_front_center">
+    <visual>
+      <geometry>
+        <box size="0.02 0.01 0.01"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.02 0.01 0.01"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.01"/>
+      <inertia ixx="0.00001" ixy="0.0" ixz="0.0" 
+               iyy="0.00001" iyz="0.0" 
+               izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <joint name="ir_front_center_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="ir_front_center"/>
+    <origin xyz="0.125 0 0.08" rpy="0 0 0"/>
+  </joint>
+
+  <!-- IR Sensor - Front Right -->
+  <link name="ir_front_right">
+    <visual>
+      <geometry>
+        <box size="0.02 0.01 0.01"/>
+      </geometry>
+      <material name="grey"/>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.02 0.01 0.01"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.01"/>
+      <inertia ixx="0.00001" ixy="0.0" ixz="0.0" 
+               iyy="0.00001" iyz="0.0" 
+               izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <joint name="ir_front_right_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="ir_front_right"/>
+    <origin xyz="0.125 -0.08 0.08" rpy="0 0 -0.3"/>
+  </joint>
+
+  <!-- Gazebo Plugins -->
+  
+  <!-- Differential Drive Plugin with DFRobot motor specs -->
+  <gazebo>
+    <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+      <left_joint>left_track_joint</left_joint>
+      <right_joint>right_track_joint</right_joint>
+      <wheel_separation>${track_separation}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+      <max_linear_acceleration>1.0</max_linear_acceleration>
+      <max_angular_acceleration>2.0</max_angular_acceleration>
+      <max_linear_velocity>0.5</max_linear_velocity>
+      <max_angular_velocity>1.0</max_angular_velocity>
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <topic>cmd_vel</topic>
+      <odom_topic>odom</odom_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_link</child_frame_id>
+    </plugin>
+  </gazebo>
+
+  <!-- IR Sensor Plugins (Sharp GP2Y0A41SK0F - 4-30cm range) -->
+  <gazebo reference="ir_front_left">
+    <sensor name="ir_front_left_sensor" type="gpu_lidar">
+      <update_rate>10</update_rate>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>5</samples>
+            <resolution>1</resolution>
+            <min_angle>-0.1</min_angle>
+            <max_angle>0.1</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>${ir_sensor_range_min}</min>
+          <max>${ir_sensor_range_max}</max>
+          <resolution>0.01</resolution>
+        </range>
+      </lidar>
+      <always_on>1</always_on>
+      <visualize>true</visualize>
+      <topic>ir_front_left</topic>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="ir_front_center">
+    <sensor name="ir_front_center_sensor" type="gpu_lidar">
+      <update_rate>10</update_rate>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>5</samples>
+            <resolution>1</resolution>
+            <min_angle>-0.1</min_angle>
+            <max_angle>0.1</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>${ir_sensor_range_min}</min>
+          <max>${ir_sensor_range_max}</max>
+          <resolution>0.01</resolution>
+        </range>
+      </lidar>
+      <always_on>1</always_on>
+      <visualize>true</visualize>
+      <topic>ir_front_center</topic>
+    </sensor>
+  </gazebo>
+
+  <gazebo reference="ir_front_right">
+    <sensor name="ir_front_right_sensor" type="gpu_lidar">
+      <update_rate>10</update_rate>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>5</samples>
+            <resolution>1</resolution>
+            <min_angle>-0.1</min_angle>
+            <max_angle>0.1</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>${ir_sensor_range_min}</min>
+          <max>${ir_sensor_range_max}</max>
+          <resolution>0.01</resolution>
+        </range>
+      </lidar>
+      <always_on>1</always_on>
+      <visualize>true</visualize>
+      <topic>ir_front_right</topic>
+    </sensor>
+  </gazebo>
+
+  <!-- Track friction -->
+  <gazebo reference="left_track">
+    <mu1>1.0</mu1>
+    <mu2>1.0</mu2>
+    <kp>1000000.0</kp>
+    <kd>100.0</kd>
+    <minDepth>0.001</minDepth>
+    <maxVel>1.0</maxVel>
+  </gazebo>
+
+  <gazebo reference="right_track">
+    <mu1>1.0</mu1>
+    <mu2>1.0</mu2>
+    <kp>1000000.0</kp>
+    <kd>100.0</kd>
+    <minDepth>0.001</minDepth>
+    <maxVel>1.0</maxVel>
+  </gazebo>
+
+</robot>
