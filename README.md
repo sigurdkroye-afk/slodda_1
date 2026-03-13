@@ -48,6 +48,6 @@ slodda_1/
 
 ## Team
 
-- [Jostein aka. SLAKTERN]
-- [Isak aka. GRØTEN]
-- [Sigurd aka. Tyngden]
+- Sigurd (tyngden)
+- Jostein (slaktern)
+- Isak (grøten)

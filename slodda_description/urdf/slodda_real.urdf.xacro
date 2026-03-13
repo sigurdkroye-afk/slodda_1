@@ -1,0 +1,145 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="slodda">
+
+  <xacro:property name="chassis_length" value="0.250"/>
+  <xacro:property name="chassis_width"  value="0.280"/>
+  <xacro:property name="chassis_height" value="0.122"/>
+  <xacro:property name="chassis_mass"   value="2.5"/>
+  <xacro:property name="wheel_radius"   value="0.045"/>
+  <xacro:property name="wheel_width"    value="0.035"/>
+  <xacro:property name="wheel_x_offset" value="0.090"/>
+  <xacro:property name="wheel_y_offset" value="0.123"/>
+
+  <material name="orange">   <color rgba="0.8 0.4 0.1 1.0"/> </material>
+  <material name="dark_grey"><color rgba="0.2 0.2 0.2 1.0"/> </material>
+  <material name="grey">     <color rgba="0.5 0.5 0.5 1.0"/> </material>
+
+  <link name="base_footprint"/>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- CHASSIS: enkel boks, ingen mesh -->
+  <link name="base_link">
+    <visual>
+      <origin xyz="0.1414 0.1000 0.0" rpy="${pi/2} 0 ${pi}"/>
+      <geometry>
+        <mesh filename="package://slodda_description/meshes/chassis.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="orange"/>
+    </visual>
+    <collision>
+      <origin xyz="0.1414 0.1000 0.0" rpy="${pi/2} 0 ${pi}"/>
+      <geometry>
+        <mesh filename="package://slodda_description/meshes/chassis.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="${chassis_mass}"/>
+      <origin xyz="0.1414 0.1000 0.0" rpy="${pi/2} 0 ${pi}"/>
+      <inertia ixx="0.052" ixy="0.0" ixz="0.0"
+               iyy="0.046" iyz="0.0"
+               izz="0.078"/>
+    </inertial>
+  </link>
+
+  <xacro:macro name="wheel" params="name x y">
+    <link name="${name}">
+      <visual>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="dark_grey"/>
+      </visual>
+      <collision>
+        <origin xyz="0 0 0" rpy="${pi/2} 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+      </collision>
+      <inertial>
+        <mass value="0.15"/>
+        <origin xyz="0 0 0"/>
+        <inertia ixx="0.0001" ixy="0.0" ixz="0.0"
+                 iyy="0.0001" iyz="0.0"
+                 izz="0.0002"/>
+      </inertial>
+    </link>
+    <joint name="${name}_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${name}"/>
+      <origin xyz="${x} ${y} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:wheel name="left_front_wheel"  x=" ${wheel_x_offset}" y=" ${wheel_y_offset}"/>
+  <xacro:wheel name="left_rear_wheel"   x="-${wheel_x_offset}" y=" ${wheel_y_offset}"/>
+  <xacro:wheel name="right_front_wheel" x=" ${wheel_x_offset}" y="-${wheel_y_offset}"/>
+  <xacro:wheel name="right_rear_wheel"  x="-${wheel_x_offset}" y="-${wheel_y_offset}"/>
+
+  <xacro:macro name="ir_sensor" params="name x y yaw">
+    <link name="${name}">
+      <visual>
+        <geometry><box size="0.02 0.01 0.01"/></geometry>
+        <material name="grey"/>
+      </visual>
+      <collision>
+        <geometry><box size="0.02 0.01 0.01"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="0.01"/>
+        <origin xyz="0 0 0"/>
+        <inertia ixx="0.00001" ixy="0.0" ixz="0.0"
+                 iyy="0.00001" iyz="0.0"
+                 izz="0.00001"/>
+      </inertial>
+    </link>
+    <joint name="${name}_joint" type="fixed">
+      <parent link="base_link"/>
+      <child link="${name}"/>
+      <origin xyz="${x} ${y} 0.04" rpy="0 0 ${yaw}"/>
+    </joint>
+  </xacro:macro>
+
+  <xacro:ir_sensor name="ir_front_left"   x="-0.135" y=" 0.07" yaw=" 0.3"/>
+  <xacro:ir_sensor name="ir_front_center" x="-0.135" y=" 0.00" yaw=" 0.0"/>
+  <xacro:ir_sensor name="ir_front_right"  x="-0.135" y="-0.07" yaw="-0.3"/>
+
+  <gazebo>
+    <plugin filename="gz-sim-diff-drive-system"
+            name="gz::sim::systems::DiffDrive">
+      <left_joint>left_rear_wheel_joint</left_joint>
+      <right_joint>right_rear_wheel_joint</right_joint>
+      <wheel_separation>${wheel_y_offset * 2}</wheel_separation>
+      <wheel_radius>${wheel_radius}</wheel_radius>
+      <max_linear_velocity>0.5</max_linear_velocity>
+      <max_angular_velocity>1.0</max_angular_velocity>
+      <max_linear_acceleration>1.0</max_linear_acceleration>
+      <max_angular_acceleration>2.0</max_angular_acceleration>
+      <odom_publish_frequency>50</odom_publish_frequency>
+      <topic>cmd_vel</topic>
+      <odom_topic>odom</odom_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_link</child_frame_id>
+    </plugin>
+  </gazebo>
+
+  <xacro:macro name="wheel_gazebo" params="name">
+    <gazebo reference="${name}">
+      <mu1>1.5</mu1><mu2>1.5</mu2>
+      <kp>1000000.0</kp><kd>100.0</kd>
+      <minDepth>0.001</minDepth><maxVel>1.0</maxVel>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:wheel_gazebo name="left_front_wheel"/>
+  <xacro:wheel_gazebo name="left_rear_wheel"/>
+  <xacro:wheel_gazebo name="right_front_wheel"/>
+  <xacro:wheel_gazebo name="right_rear_wheel"/>
+
+</robot>
