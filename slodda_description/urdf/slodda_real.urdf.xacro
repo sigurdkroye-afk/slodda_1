@@ -32,17 +32,17 @@
       <material name="orange"/>
     </visual>
     <collision>
-      <origin xyz="0.1414 0.1000 0.0" rpy="${pi/2} 0 ${pi}"/>
+      <origin xyz="0 0 0.061" rpy="0 0 0"/>
       <geometry>
-        <mesh filename="package://slodda_description/meshes/chassis.stl" scale="0.001 0.001 0.001"/>
+        <box size="${chassis_length} ${chassis_width} ${chassis_height}"/>
       </geometry>
     </collision>
     <inertial>
       <mass value="${chassis_mass}"/>
-      <origin xyz="0.1414 0.1000 0.0" rpy="${pi/2} 0 ${pi}"/>
-      <inertia ixx="0.052" ixy="0.0" ixz="0.0"
-               iyy="0.046" iyz="0.0"
-               izz="0.078"/>
+      <origin xyz="0 0 0.061" rpy="0 0 0"/>
+      <inertia ixx="0.0197" ixy="0.0" ixz="0.0"
+               iyy="0.0164" iyz="0.0"
+               izz="0.0309"/>
     </inertial>
   </link>
 
@@ -73,7 +73,7 @@
       <parent link="base_link"/>
       <child link="${name}"/>
       <origin xyz="${x} ${y} 0" rpy="0 0 0"/>
-      <axis xyz="0 1 0"/>
+      <axis xyz="0 -1 0"/>
     </joint>
   </xacro:macro>
 
@@ -104,6 +104,9 @@
       <child link="${name}"/>
       <origin xyz="${x} ${y} 0.04" rpy="0 0 ${yaw}"/>
     </joint>
+    <gazebo reference="${name}_joint">
+      <preserveFixedJoint>true</preserveFixedJoint>
+    </gazebo>
   </xacro:macro>
 
   <xacro:ir_sensor name="ir_front_left"   x="-0.135" y=" 0.07" yaw=" 0.3"/>
@@ -113,7 +116,9 @@
   <gazebo>
     <plugin filename="gz-sim-diff-drive-system"
             name="gz::sim::systems::DiffDrive">
+      <left_joint>left_front_wheel_joint</left_joint>
       <left_joint>left_rear_wheel_joint</left_joint>
+      <right_joint>right_front_wheel_joint</right_joint>
       <right_joint>right_rear_wheel_joint</right_joint>
       <wheel_separation>${wheel_y_offset * 2}</wheel_separation>
       <wheel_radius>${wheel_radius}</wheel_radius>
@@ -141,5 +146,37 @@
   <xacro:wheel_gazebo name="left_rear_wheel"/>
   <xacro:wheel_gazebo name="right_front_wheel"/>
   <xacro:wheel_gazebo name="right_rear_wheel"/>
+
+
+  <!-- IR Sensor Plugins -->
+  <xacro:macro name="ir_gazebo" params="name topic">
+    <gazebo reference="${name}">
+      <sensor name="${name}_sensor" type="gpu_lidar">
+        <update_rate>10</update_rate>
+        <lidar>
+          <scan>
+            <horizontal>
+              <samples>5</samples>
+              <resolution>1</resolution>
+              <min_angle>-0.1</min_angle>
+              <max_angle>0.1</max_angle>
+            </horizontal>
+          </scan>
+          <range>
+            <min>0.04</min>
+            <max>0.30</max>
+            <resolution>0.01</resolution>
+          </range>
+        </lidar>
+        <always_on>1</always_on>
+        <visualize>true</visualize>
+        <topic>${topic}</topic>
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:ir_gazebo name="ir_front_left"   topic="ir_front_left"/>
+  <xacro:ir_gazebo name="ir_front_center" topic="ir_front_center"/>
+  <xacro:ir_gazebo name="ir_front_right"  topic="ir_front_right"/>
 
 </robot>
