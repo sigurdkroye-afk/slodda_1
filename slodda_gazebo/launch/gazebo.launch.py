@@ -52,7 +52,7 @@ def generate_launch_description():
             ]
         ),
 
-        Node(
+     	Node(
             package='ros_gz_bridge',
             executable='parameter_bridge',
             name='bridge',
@@ -64,6 +64,10 @@ def generate_launch_description():
                 '/ir_front_left@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
                 '/ir_front_center@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
                 '/ir_front_right@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
+                '/world/arena/model/slodda/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model',
+            ],
+            remappings=[
+                ('/world/arena/model/slodda/joint_state', '/joint_states'),
             ]
         ),
     ])

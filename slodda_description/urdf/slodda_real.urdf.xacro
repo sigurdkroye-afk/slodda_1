@@ -179,4 +179,10 @@
   <xacro:ir_gazebo name="ir_front_center" topic="ir_front_center"/>
   <xacro:ir_gazebo name="ir_front_right"  topic="ir_front_right"/>
 
+  <gazebo>
+    <plugin filename="gz-sim-joint-state-publisher-system"
+            name="gz::sim::systems::JointStatePublisher">
+    </plugin>
+  </gazebo>
+
 </robot>
