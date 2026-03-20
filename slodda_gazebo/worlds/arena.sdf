@@ -1,12 +1,10 @@
 <?xml version="1.0" ?>
 <sdf version="1.8">
   <world name="arena">
-
     <physics name="1ms" type="ignored">
       <max_step_size>0.001</max_step_size>
       <real_time_factor>1.0</real_time_factor>
     </physics>
-
     <plugin filename="gz-sim-physics-system"
             name="gz::sim::systems::Physics"/>
     <plugin filename="gz-sim-user-commands-system"
@@ -17,7 +15,6 @@
             name="gz::sim::systems::Sensors">
       <render_engine>ogre2</render_engine>
     </plugin>
-
     <light name="sun" type="directional">
       <cast_shadows>true</cast_shadows>
       <pose>0 0 10 0 0 0</pose>
@@ -25,7 +22,6 @@
       <specular>0.2 0.2 0.2 1</specular>
       <direction>-0.5 0.1 -0.9</direction>
     </light>
-
     <!-- Gulv -->
     <model name="ground_plane">
       <static>true</static>
@@ -42,8 +38,7 @@
         </visual>
       </link>
     </model>
-
-    <!-- Nordvegg (bak)  Y=+1.2 -->
+    <!-- Nordvegg Y=+1.2 -->
     <model name="wall_north">
       <static>true</static>
       <pose>0 1.2 0.25 0 0 0</pose>
@@ -57,8 +52,7 @@
         </visual>
       </link>
     </model>
-
-    <!-- Sørvegg (foran) Y=-1.2 -->
+    <!-- Sørvegg Y=-1.2 -->
     <model name="wall_south">
       <static>true</static>
       <pose>0 -1.2 0.25 0 0 0</pose>
@@ -72,8 +66,7 @@
         </visual>
       </link>
     </model>
-
-    <!-- Østvegg (høyre) X=+1.8 -->
+    <!-- Østvegg X=+1.8 -->
     <model name="wall_east">
       <static>true</static>
       <pose>1.8 0 0.25 0 0 0</pose>
@@ -87,8 +80,7 @@
         </visual>
       </link>
     </model>
-
-    <!-- Vestvegg (venstre) X=-1.8 -->
+    <!-- Vestvegg X=-1.8 -->
     <model name="wall_west">
       <static>true</static>
       <pose>-1.8 0 0.25 0 0 0</pose>
@@ -102,6 +94,33 @@
         </visual>
       </link>
     </model>
-
+    <!-- Hindring 1 — midt i robotens vei (0.5, 0.0) -->
+    <model name="obstacle_1">
+      <static>true</static>
+      <pose>0.5 0.0 0.15 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 0.15 0.3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.3</size></box></geometry>
+          <material><ambient>0.8 0.2 0.2 1</ambient><diffuse>0.8 0.2 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <!-- Hindring 2 — litt til siden (0.9, 0.3) -->
+    <model name="obstacle_2">
+      <static>true</static>
+      <pose>0.9 0.3 0.15 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry><box><size>0.15 0.15 0.3</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>0.15 0.15 0.3</size></box></geometry>
+          <material><ambient>0.8 0.5 0.2 1</ambient><diffuse>0.8 0.5 0.2 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
   </world>
 </sdf>

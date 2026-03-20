@@ -1,16 +1,21 @@
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import QoSProfile, DurabilityPolicy
 from nav_msgs.msg import Odometry, Path
 from geometry_msgs.msg import PoseStamped
 import heapq
 import math
-
 
 ARENA_W = 3.6
 ARENA_H = 2.4
 CELL = 0.05
 COLS = int(ARENA_W / CELL)
 ROWS = int(ARENA_H / CELL)
+
+OBSTACLES = [
+    (0.5,  0.0, 0.12),
+    (0.9,  0.3, 0.12),
+]
 
 
 def build_grid():
@@ -20,6 +25,15 @@ def build_grid():
     grid[-1, :] = 1
     grid[:, 0] = 1
     grid[:, -1] = 1
+    margin = 3
+    for ox, oy, hw in OBSTACLES:
+        c_center = int((ox + ARENA_W / 2) / CELL)
+        r_center = int((oy + ARENA_H / 2) / CELL)
+        half = int(hw / CELL) + margin
+        for r in range(r_center - half, r_center + half + 1):
+            for c in range(c_center - half, c_center + half + 1):
+                if 0 <= r < ROWS and 0 <= c < COLS:
+                    grid[r, c] = 1
     return grid
 
 
@@ -46,7 +60,6 @@ def astar(grid, start, goal):
     heapq.heappush(open_set, (0.0, start))
     came_from = {}
     g_score = {start: 0.0}
-
     while open_set:
         _, current = heapq.heappop(open_set)
         if current == goal:
@@ -56,7 +69,6 @@ def astar(grid, start, goal):
                 current = came_from[current]
             path.append(start)
             return path[::-1]
-
         for dr, dc in [(-1,0),(1,0),(0,-1),(0,1),
                        (-1,-1),(-1,1),(1,-1),(1,1)]:
             nb = (current[0] + dr, current[1] + dc)
@@ -66,7 +78,7 @@ def astar(grid, start, goal):
                 continue
             step = 1.414 if dr != 0 and dc != 0 else 1.0
             tentative_g = g_score[current] + step
-            if tentative_g < g_score.get(nb, float('inf')):
+            if tentative_g < g_score.get(nb, float("inf")):
                 came_from[nb] = current
                 g_score[nb] = tentative_g
                 f = tentative_g + heuristic(nb, goal)
@@ -106,47 +118,36 @@ def line_free(a, b, grid):
 
 class AstarPlanner(Node):
     def __init__(self):
-        super().__init__('astar_planner')
+        super().__init__("astar_planner")
         self.grid = build_grid()
         self.current_pos = (0.0, 0.0)
-
-        self.odom_sub = self.create_subscription(
-            Odometry, '/odom', self.odom_cb, 10)
-        from rclpy.qos import QoSProfile, DurabilityPolicy
         qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self.create_subscription(Odometry, "/odom", self.odom_cb, 10)
         self.path_pub = self.create_publisher(Path, "/planned_path", qos)
-
-        # Mål: kjør til (1.0, 0.0) — høyre side av arenaen
         self.goal_world = (1.0, 0.0)
-        self.get_logger().info('A* planner klar. Planlegger om 2 sekunder...')
+        self.get_logger().info("A* planner klar. Planlegger om 2 sekunder...")
         self.timer = self.create_timer(2.0, self.plan_once)
 
     def odom_cb(self, msg):
         self.current_pos = (
             msg.pose.pose.position.x,
-            msg.pose.pose.position.y
-        )
+            msg.pose.pose.position.y)
 
     def plan_once(self):
         self.timer.cancel()
         start = world_to_grid(*self.current_pos)
-        goal = world_to_grid(*self.goal_world)
-
-        self.get_logger().info(f'Start: {start}  Mål: {goal}')
+        goal  = world_to_grid(*self.goal_world)
+        self.get_logger().info(f"Start: {start}  Maal: {goal}")
         raw = astar(self.grid, start, goal)
-
         if not raw:
-            self.get_logger().error('Ingen sti funnet!')
+            self.get_logger().error("Ingen sti funnet!")
             return
-
         path = smooth_path(raw, self.grid)
         self.get_logger().info(
-            f'Rå sti: {len(raw)} noder  →  Glatt sti: {len(path)} noder')
-
+            f"Ra sti: {len(raw)} noder  ->  Glatt sti: {len(path)} noder")
         msg = Path()
-        msg.header.frame_id = 'odom'
+        msg.header.frame_id = "odom"
         msg.header.stamp = self.get_clock().now().to_msg()
-
         for row, col in path:
             wx, wy = grid_to_world(row, col)
             ps = PoseStamped()
@@ -155,9 +156,8 @@ class AstarPlanner(Node):
             ps.pose.position.y = wy
             ps.pose.orientation.w = 1.0
             msg.poses.append(ps)
-
         self.path_pub.publish(msg)
-        self.get_logger().info('Sti publisert på /planned_path')
+        self.get_logger().info("Sti publisert pa /planned_path")
 
 
 def main(args=None):
@@ -167,5 +167,5 @@ def main(args=None):
     rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
