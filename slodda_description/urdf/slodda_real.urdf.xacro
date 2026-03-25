@@ -109,9 +109,9 @@
     </gazebo>
   </xacro:macro>
 
-  <xacro:ir_sensor name="ir_front_left"   x="-0.135" y=" 0.07" yaw=" 0.3"/>
-  <xacro:ir_sensor name="ir_front_center" x="-0.135" y=" 0.00" yaw=" 0.0"/>
-  <xacro:ir_sensor name="ir_front_right"  x="-0.135" y="-0.07" yaw="-0.3"/>
+  <xacro:ir_sensor name="ir_front_left"   x="-0.135" y=" 0.07" yaw="${pi - 0.3}"/>
+  <xacro:ir_sensor name="ir_front_center" x="-0.135" y=" 0.00" yaw="${pi}"/>
+  <xacro:ir_sensor name="ir_front_right"  x="-0.135" y="-0.07" yaw="${pi + 0.3}"/>
 
   <gazebo>
     <plugin filename="gz-sim-diff-drive-system"

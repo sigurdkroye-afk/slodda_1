@@ -25,7 +25,7 @@ def generate_launch_description():
         ),
 
         ExecuteProcess(
-            cmd=['gz', 'sim', world_file, '--headless-rendering', '--render-engine-server', 'ogre2'],
+            cmd=['gz', 'sim', world_file, '--render-engine-server', 'ogre'],
             output='screen'
         ),
 
