@@ -29,6 +29,7 @@ setup(
             'hello_robot = slodda_bringup.hello_robot:main',
             'astar_planner = slodda_bringup.astar_planner:main',
             'apf_controller = slodda_bringup.apf_controller:main',
+            'obstacle_avoider = slodda_bringup.obstacle_avoider:main',
         ],
     },
 )

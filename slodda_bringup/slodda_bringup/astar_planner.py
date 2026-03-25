@@ -13,8 +13,11 @@ COLS = int(ARENA_W / CELL)
 ROWS = int(ARENA_H / CELL)
 
 OBSTACLES = [
-    (0.5,  0.0, 0.12),
-    (0.9,  0.3, 0.12),
+    (0.5,  0.0,  0.12),
+    (0.9,  0.3,  0.12),
+    (0.2,  0.5,  0.12),
+    (-0.4, -0.3, 0.12),
+    (1.2,  -0.5, 0.12),
 ]
 
 
@@ -124,8 +127,8 @@ class AstarPlanner(Node):
         qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.create_subscription(Odometry, "/odom", self.odom_cb, 10)
         self.path_pub = self.create_publisher(Path, "/planned_path", qos)
-        self.goal_world = (1.0, 0.0)
-        self.get_logger().info("A* planner klar. Planlegger om 2 sekunder...")
+        self.goal_world = (1.5, 0.8)
+        self.get_logger().info("A* planner klar. Maal: (1.5, 0.8) — tvers over arenaen")
         self.timer = self.create_timer(2.0, self.plan_once)
 
     def odom_cb(self, msg):

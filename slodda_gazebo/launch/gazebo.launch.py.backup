@@ -25,10 +25,10 @@ def generate_launch_description():
         ),
 
         ExecuteProcess(
-            cmd=['gz', 'sim', world_file, '--render-engine-server', 'ogre2', '--render-engine-gui', 'ogre'],
+            cmd=['gz', 'sim', world_file, '--headless-rendering', '--render-engine-server', 'ogre2'],
             output='screen'
         ),
-        
+
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
