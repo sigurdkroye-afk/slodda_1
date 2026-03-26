@@ -99,7 +99,7 @@
     <joint name="${name}_joint" type="fixed">
       <parent link="base_link"/>
       <child link="${name}"/>
-      <origin xyz="${x} ${y} 0.13" rpy="0 0 ${yaw}"/>
+      <origin xyz="${x} ${y} 0.075" rpy="0 0 ${yaw}"/>
     </joint>
   </xacro:macro>
 
