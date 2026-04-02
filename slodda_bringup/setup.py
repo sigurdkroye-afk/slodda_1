@@ -12,6 +12,8 @@ setup(
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob(os.path.join('launch', '*launch.py'))),
         (os.path.join('share', package_name, 'config'), glob(os.path.join('config', '*.yaml'))),
+        (os.path.join('share', package_name, 'config'), glob(os.path.join('config', '*.rviz'))),
+        (os.path.join('share', package_name, 'scripts'), glob(os.path.join('scripts', '*.py'))),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
@@ -30,6 +32,7 @@ setup(
             'astar_planner = slodda_bringup.astar_planner:main',
             'apf_controller = slodda_bringup.apf_controller:main',
             'obstacle_avoider = slodda_bringup.obstacle_avoider:main',
+            'waypoint_mission = slodda_bringup.waypoint_mission:main',
         ],
     },
 )

@@ -31,11 +31,11 @@ amcl:
     sigma_hit: 0.2
     tf_broadcast: true
     transform_tolerance: 1.0
-    update_min_a: 0.2
-    update_min_d: 0.25
-    z_hit: 0.5
+    update_min_a: 0.1
+    update_min_d: 0.1
+    z_hit: 0.8
     z_max: 0.05
-    z_rand: 0.5
+    z_rand: 0.2
     z_short: 0.05
     scan_topic: /scan
     set_initial_pose: true
@@ -76,7 +76,7 @@ controller_server:
       allow_reversing: false
       transform_tolerance: 0.1
       use_rotate_to_heading: true
-      rotate_to_heading_angular_vel: 0.8
+      rotate_to_heading_angular_vel: 1.2
       rotate_to_heading_min_angle: 0.785
 
 local_costmap:
@@ -111,7 +111,7 @@ local_costmap:
           clearing: true
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.20
+        inflation_radius: 0.22
         cost_scaling_factor: 5.0
 
 global_costmap:
@@ -145,7 +145,7 @@ global_costmap:
           clearing: true
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.20
+        inflation_radius: 0.22
         cost_scaling_factor: 5.0
 
 map_server:
@@ -190,10 +190,10 @@ behavior_server:
     global_frame: map
     robot_base_frame: base_footprint
     transform_tolerance: 0.1
-    simulate_ahead_time: 2.0
-    max_rotational_vel: 0.8
-    min_rotational_vel: 0.4
-    rotational_acc_lim: 3.2
+    simulate_ahead_time: 1.0
+    max_rotational_vel: 1.5
+    min_rotational_vel: 0.5
+    rotational_acc_lim: 2.0
 
 waypoint_follower:
   ros__parameters:
