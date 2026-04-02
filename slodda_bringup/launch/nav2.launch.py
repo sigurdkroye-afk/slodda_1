@@ -89,7 +89,7 @@ def generate_launch_description():
     )
 
     nav2_nodes = TimerAction(
-        period=20.0,
+        period=8.0,
         actions=[
             amcl,
             map_server,
