@@ -8,7 +8,6 @@ import xacro
 def generate_launch_description():
     pkg_gazebo = get_package_share_directory('slodda_gazebo')
     pkg_description = get_package_share_directory('slodda_description')
-    install_share = os.path.join(pkg_description, '..', '..', '..', '..')
     world_file = os.path.join(pkg_gazebo, 'worlds', 'arena.sdf')
     xacro_file = os.path.join(pkg_description, 'urdf', 'slodda_real.urdf.xacro')
     robot_description = xacro.process_file(xacro_file).toxml()
@@ -39,7 +38,9 @@ def generate_launch_description():
             output='screen',
             arguments=[
                 '-name', 'slodda',
-                '-x', '0', '-y', '0', '-z', '0.1',
+                '-x', '0',
+                '-y', '0',
+                '-z', '0.1',
                 '-topic', 'robot_description'
             ]
         ),
@@ -50,13 +51,14 @@ def generate_launch_description():
             output='screen',
             arguments=[
                 '/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
-                '/odom@nav_msgs/msg/Odometry@gz.msgs.Odometry',
-                '/tf@tf2_msgs/msg/TFMessage@gz.msgs.Pose_V',
+                '/odom@nav_msgs/msg/Odometry[gz.msgs.Odometry',
+                '/tf@tf2_msgs/msg/TFMessage[gz.msgs.Pose_V',
                 '/ir_front_left@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
                 '/ir_front_center@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
                 '/ir_front_right@sensor_msgs/msg/LaserScan@gz.msgs.LaserScan',
                 '/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
                 '/world/arena/model/slodda/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model',
+                '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
             ],
             remappings=[
                 ('/world/arena/model/slodda/joint_state', '/joint_states'),
