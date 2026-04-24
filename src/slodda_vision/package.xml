@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>slodda_vision</name>
+  <version>0.0.1</version>
+  <description>YOLO-basert objektdeteksjon for Slødda 1</description>
+  <maintainer email="sigurkoy@stud.ntnu.no">slodda1</maintainer>
+  <license>MIT</license>
+  <depend>rclpy</depend>
+  <depend>sensor_msgs</depend>
+  <depend>visualization_msgs</depend>
+  <depend>geometry_msgs</depend>
+  <buildtool_depend>ament_python</buildtool_depend>
+  <test_depend>ament_lint_auto</test_depend>
+</package>
