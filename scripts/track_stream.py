@@ -1,83 +1,89 @@
-from picamera2 import Picamera2
-import cv2, time, threading
+import threading, time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from socketserver import ThreadingMixIn
+from picamera2 import Picamera2
+from libcamera import controls
+from ultralytics import YOLO
+import cv2
 
-class ThreadedHTTPServer(ThreadingMixIn, HTTPServer): pass
+BEAR_CLASSES = [21, 77]  # 'bear' og 'teddy bear'
+
+model = YOLO('/home/slodda1/yolov8n.pt')
 
 picam2 = Picamera2()
-config = picam2.create_preview_configuration(main={"format": "RGB888", "size": (640, 480)})
-picam2.configure(config)
+picam2.configure(picam2.create_preview_configuration(main={"format": "RGB888", "size": (640, 480)}))
 picam2.start()
+
+# La AWB stabilisere seg, bruk tungsten-modus for innendørs kunstig lys
+time.sleep(3)
+picam2.set_controls({"AwbEnable": True, "AwbMode": controls.AwbModeEnum.Tungsten})
 time.sleep(2)
 
-tracker = None
-tracking = False
 latest_frame = None
-latest_bgr = None
-lock = threading.Lock()
+frame_lock = threading.Lock()
+frame_event = threading.Event()
 
-def loop():
-    global tracker, tracking, latest_frame, latest_bgr
+
+def capture_loop():
+    global latest_frame
     while True:
-        raw = picam2.capture_array()
-        frame = cv2.cvtColor(raw, cv2.COLOR_RGB2BGR)
-        if tracking and tracker is not None:
-            success, bbox = tracker.update(frame)
-            if success:
-                x, y, w, h = [int(v) for v in bbox]
-                cv2.rectangle(frame, (x,y), (x+w,y+h), (0,255,0), 2)
-                cv2.putText(frame, 'Tracking', (x, y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)
-            else:
-                tracking = False
-                cv2.putText(frame, 'Lost', (20,40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,0,255), 2)
-        else:
-            cv2.putText(frame, 'No target', (20,40), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0,165,255), 2)
-        ret, jpeg = cv2.imencode('.jpg', frame)
-        with lock:
+        frame = picam2.capture_array()
+
+        results = model(frame, classes=BEAR_CLASSES, verbose=False, conf=0.25)
+        for box in results[0].boxes:
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            conf = float(box.conf[0])
+            cls_name = model.names[int(box.cls[0])]
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 200, 255), 2)
+            cv2.putText(frame, f'{cls_name} {conf:.0%}', (x1, y1 - 8),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 200, 255), 2)
+
+        if not results[0].boxes:
+            cv2.putText(frame, 'Ingen bamse...', (20, 40),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (80, 80, 255), 2)
+
+        _, jpeg = cv2.imencode('.jpg', frame, [cv2.IMWRITE_JPEG_QUALITY, 75])
+        with frame_lock:
             latest_frame = jpeg.tobytes()
-            latest_bgr = frame.copy()
-        time.sleep(0.05)
+        frame_event.set()
+        frame_event.clear()
+
 
 class Handler(BaseHTTPRequestHandler):
-    def log_message(self, f, *a): pass
+    def log_message(self, f, *a):
+        pass
+
     def do_GET(self):
-        global tracker, tracking
-        if self.path == '/init':
-            with lock:
-                frame = latest_bgr.copy() if latest_bgr is not None else None
-            if frame is None:
-                self.send_response(503); self.end_headers()
-                self.wfile.write(b'Not ready'); return
-            h, w = frame.shape[:2]
-            bbox = (w//4, h//4, w//2, h//2)
-            tracker = cv2.legacy.TrackerCSRT_create()
-            tracker.init(frame, bbox)
-            tracking = True
-            self.send_response(200); self.end_headers()
-            self.wfile.write(b'Tracker initialized')
-        elif self.path == '/stream':
+        if self.path == '/stream':
             self.send_response(200)
+            self.send_header('Cache-Control', 'no-cache, private')
             self.send_header('Content-Type', 'multipart/x-mixed-replace; boundary=frame')
             self.end_headers()
             try:
                 while True:
-                    with lock:
-                        f = latest_frame
-                    if f:
-                        part = (
+                    frame_event.wait(timeout=2)
+                    with frame_lock:
+                        frame = latest_frame
+                    if frame:
+                        self.wfile.write(
                             b'--frame\r\n'
                             b'Content-Type: image/jpeg\r\n'
-                            b'Content-Length: ' + str(len(f)).encode() + b'\r\n'
-                            b'\r\n' + f + b'\r\n'
+                            b'Content-Length: ' + str(len(frame)).encode() + b'\r\n'
+                            b'\r\n' + frame + b'\r\n'
                         )
-                        self.wfile.write(part)
                         self.wfile.flush()
-                    time.sleep(0.05)
-            except (BrokenPipeError, ConnectionResetError):
+            except Exception:
                 pass
+        else:
+            self.send_response(404)
+            self.end_headers()
 
-threading.Thread(target=loop, daemon=True).start()
+
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    allow_reuse_address = True
+    daemon_threads = True
+
+
+threading.Thread(target=capture_loop, daemon=True).start()
 print('Stream: http://172.20.10.2:5000/stream')
-print('Init:   http://172.20.10.2:5000/init')
-ThreadedHTTPServer(('0.0.0.0', 5000), Handler).serve_forever()
+ThreadedHTTPServer(('', 5000), Handler).serve_forever()
