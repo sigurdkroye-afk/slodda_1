@@ -15,7 +15,8 @@ def generate_launch_description():
     return LaunchDescription([
         SetEnvironmentVariable(
             'GZ_SIM_RESOURCE_PATH',
-            os.path.join(pkg_description, '..')
+            os.path.join(pkg_description, '..') + os.pathsep +
+            os.path.join(pkg_gazebo, 'models')
         ),
         ExecuteProcess(
             cmd=['gz', 'sim', world_file, '--render-engine-server', 'ogre2', '--render-engine-gui', 'ogre'],
@@ -59,6 +60,8 @@ def generate_launch_description():
                 '/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
                 '/world/arena/model/slodda/joint_state@sensor_msgs/msg/JointState[gz.msgs.Model',
                 '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+                '/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image',
+                '/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
             ],
             remappings=[
                 ('/world/arena/model/slodda/joint_state', '/joint_states'),

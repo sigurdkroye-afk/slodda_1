@@ -33,6 +33,9 @@ setup(
             'apf_controller = slodda_bringup.apf_controller:main',
             'obstacle_avoider = slodda_bringup.obstacle_avoider:main',
             'waypoint_mission = slodda_bringup.waypoint_mission:main',
+            'object_tracker = slodda_bringup.object_tracker:main',
+            'yolo_detector = slodda_bringup.yolo_detector:main',
+            'bear_mission = slodda_bringup.bear_mission:main',
         ],
     },
 )

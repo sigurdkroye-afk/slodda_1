@@ -28,6 +28,7 @@ install(DIRECTORY
   launch
   config
   maps
+  models
   DESTINATION share/${PROJECT_NAME}
 )
 ament_package()
