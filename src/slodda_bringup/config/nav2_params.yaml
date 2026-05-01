@@ -74,7 +74,7 @@ controller_server:
       regulated_linear_scaling_min_radius: 0.9
       regulated_linear_scaling_min_speed: 0.25
       allow_reversing: false
-      transform_tolerance: 0.1
+      transform_tolerance: 0.5
       use_rotate_to_heading: true
       rotate_to_heading_angular_vel: 1.2
       rotate_to_heading_min_angle: 0.785
@@ -85,7 +85,7 @@ local_costmap:
       use_sim_time: true
       update_frequency: 5.0
       publish_frequency: 2.0
-      global_frame: map
+      global_frame: odom
       robot_base_frame: base_footprint
       transform_tolerance: 2.0
       rolling_window: true
