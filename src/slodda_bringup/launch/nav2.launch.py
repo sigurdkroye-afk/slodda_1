@@ -79,16 +79,19 @@ def generate_launch_description():
         parameters=[sim_time, nav2_params]
     )
 
-    # Localization starts first — bond_timeout=0 means no service-response timeout
+    # Lifecycle managers must NOT use sim_time — their service_timeout must be
+    # wall-clock seconds so that the timeout works reliably during Gazebo startup.
     lifecycle_manager_localization = Node(
         package='nav2_lifecycle_manager',
         executable='lifecycle_manager',
         name='lifecycle_manager_localization',
         output='screen',
-        parameters=[sim_time, {
+        parameters=[{
+            'use_sim_time': False,
             'autostart': True,
             'node_names': ['map_server', 'amcl'],
             'bond_timeout': 0.0,
+            'service_timeout': 30.0,
         }]
     )
 
@@ -97,7 +100,8 @@ def generate_launch_description():
         executable='lifecycle_manager',
         name='lifecycle_manager_navigation',
         output='screen',
-        parameters=[sim_time, {
+        parameters=[{
+            'use_sim_time': False,
             'autostart': True,
             'node_names': [
                 'controller_server',
@@ -107,30 +111,39 @@ def generate_launch_description():
                 'bt_navigator',
             ],
             'bond_timeout': 0.0,
+            'service_timeout': 30.0,
         }]
     )
 
-    # Localization at 10 s — gives Gazebo time to fully load
+    # Localization nodes at 10 s — gives Gazebo time to fully load
     localization_nodes = TimerAction(
         period=10.0,
-        actions=[
-            map_server,
-            amcl,
-            lifecycle_manager_localization,
-        ]
+        actions=[map_server, amcl]
     )
 
-    # Navigation at 15 s — after localization has time to activate
-    navigation_nodes = TimerAction(
+    # Lifecycle manager starts 5 s AFTER the nodes it manages, avoiding the
+    # race where change_state is called before the node has advertised its services.
+    lifecycle_localization = TimerAction(
         period=15.0,
+        actions=[lifecycle_manager_localization]
+    )
+
+    # Navigation nodes at 18 s
+    navigation_nodes = TimerAction(
+        period=18.0,
         actions=[
             controller_server,
             planner_server,
             smoother_server,
             behavior_server,
             bt_navigator,
-            lifecycle_manager_navigation,
         ]
+    )
+
+    # Lifecycle manager for navigation 5 s after navigation nodes
+    lifecycle_navigation = TimerAction(
+        period=23.0,
+        actions=[lifecycle_manager_navigation]
     )
 
     rviz = Node(
@@ -143,26 +156,15 @@ def generate_launch_description():
         output='screen'
     )
 
-    object_tracker = TimerAction(
-        period=12.0,
-        actions=[
-            Node(
-                package='slodda_bringup',
-                executable='object_tracker',
-                name='object_tracker',
-                output='screen'
-            )
-        ]
-    )
-
     return LaunchDescription([
         gazebo,
         localization_nodes,
+        lifecycle_localization,
         navigation_nodes,
+        lifecycle_navigation,
         rviz,
-        object_tracker,
         TimerAction(
-            period=18.0,
+            period=28.0,
             actions=[
                 Node(
                     package='slodda_bringup',
@@ -172,16 +174,15 @@ def generate_launch_description():
                 ),
                 Node(
                     package='slodda_bringup',
-                    executable='bear_mission',
-                    name='bear_mission',
+                    executable='mission_control',
+                    name='mission_control',
                     output='screen',
-                    parameters=[{'goal_x': 1.0, 'goal_y': 0.0}]
+                    parameters=[{'image_width': 640}]
                 ),
                 Node(
-                    package='rqt_image_view',
-                    executable='rqt_image_view',
-                    name='image_view',
-                    arguments=['/yolo/image'],
+                    package='slodda_bringup',
+                    executable='camera_control_panel',
+                    name='camera_control_panel',
                     output='screen'
                 ),
             ]
