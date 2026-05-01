@@ -36,6 +36,10 @@ setup(
             'object_tracker = slodda_bringup.object_tracker:main',
             'yolo_detector = slodda_bringup.yolo_detector:main',
             'bear_mission = slodda_bringup.bear_mission:main',
+            'mission_control = slodda_bringup.mission_control:main',
+            'control_panel = slodda_bringup.control_panel:main',
+            'camera_control_panel = slodda_bringup.camera_control_panel:main',
+            'motor_driver = slodda_bringup.motor_driver_node:main',
         ],
     },
 )
