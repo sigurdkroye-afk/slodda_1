@@ -1,10 +1,16 @@
 cmake_minimum_required(VERSION 3.20)
-project(slodda_gazebo)
+project(slodda_description)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
-
+# Install directories
+install(DIRECTORY
+  urdf
+  launch
+  config
+  DESTINATION share/${PROJECT_NAME}
+)
 # find dependencies
 find_package(ament_cmake REQUIRED)
 # uncomment the following section in order to fill in
@@ -22,12 +28,5 @@ if(BUILD_TESTING)
   set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
-# Install directories
-install(DIRECTORY
-  worlds
-  launch
-  config
-  maps
-  DESTINATION share/${PROJECT_NAME}
-)
+
 ament_package()

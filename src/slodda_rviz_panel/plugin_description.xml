@@ -1,0 +1,7 @@
+<library path="slodda_rviz_panel">
+  <class name="slodda_rviz_panel/MissionPanel"
+         type="slodda_rviz_panel::MissionPanel"
+         base_class_type="rviz_common::Panel">
+    <description>Mission control panel — Start, Approve, Return Home, Abort</description>
+  </class>
+</library>

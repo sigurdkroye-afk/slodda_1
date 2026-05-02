@@ -1,14 +1,24 @@
 <?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>slodda_vision</name>
-  <version>0.0.1</version>
-  <description>YOLO-basert objektdeteksjon for Slødda 1</description>
-  <maintainer email="sigurkoy@stud.ntnu.no">slodda1</maintainer>
-  <license>MIT</license>
+  <version>0.0.0</version>
+  <description>TODO: Package description</description>
+  <maintainer email="sigurkoy@stud.ntnu.no">Sigurd Kristian Øye</maintainer>
+  <license>TODO: License declaration</license>
+
   <depend>rclpy</depend>
   <depend>sensor_msgs</depend>
-  <depend>visualization_msgs</depend>
-  <depend>geometry_msgs</depend>
-  <buildtool_depend>ament_python</buildtool_depend>
-  <test_depend>ament_lint_auto</test_depend>
+  <depend>cv_bridge</depend>
+
+  <test_depend>ament_copyright</test_depend>
+  <test_depend>ament_flake8</test_depend>
+  <test_depend>ament_mypy</test_depend>
+  <test_depend>ament_pep257</test_depend>
+  <test_depend>ament_xmllint</test_depend>
+  <test_depend>python3-pytest</test_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
 </package>
