@@ -62,6 +62,7 @@ def generate_launch_description():
                 '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
                 '/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image',
                 '/camera/camera_info@sensor_msgs/msg/CameraInfo[gz.msgs.CameraInfo',
+                '/imu/data@sensor_msgs/msg/Imu[gz.msgs.IMU',
             ],
             remappings=[
                 ('/world/arena/model/slodda/joint_state', '/joint_states'),

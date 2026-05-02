@@ -26,7 +26,6 @@ endif()
 install(DIRECTORY
   worlds
   launch
-  config
   maps
   models
   DESTINATION share/${PROJECT_NAME}
