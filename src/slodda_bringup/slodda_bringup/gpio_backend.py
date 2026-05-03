@@ -73,3 +73,57 @@ class StubGpioBackend(GpioBackend):
 
     def cleanup(self):
         self._log('[GPIO stub] cleanup')
+
+
+class RpiPwmHandle(PwmHandle):
+    def __init__(self, pwm):
+        self._pwm = pwm
+
+    def start(self, duty_percent: float) -> None:
+        self._pwm.start(duty_percent)
+
+    def set_duty(self, duty_percent: float) -> None:
+        self._pwm.ChangeDutyCycle(duty_percent)
+
+    def stop(self) -> None:
+        self._pwm.stop()
+
+
+class RpiGpioBackend(GpioBackend):
+    """RPi.GPIO backend for Raspberry Pi hardware. Requires RPi.GPIO installed."""
+
+    _EDGE = {'rising': None, 'falling': None, 'both': None}
+
+    def __init__(self):
+        import RPi.GPIO as GPIO  # noqa: N813
+        self._GPIO = GPIO
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
+        self._EDGE = {
+            'rising':  GPIO.RISING,
+            'falling': GPIO.FALLING,
+            'both':    GPIO.BOTH,
+        }
+
+    def setup_output(self, pin: int) -> None:
+        self._GPIO.setup(pin, self._GPIO.OUT, initial=self._GPIO.LOW)
+
+    def setup_input(self, pin: int, pull_up: bool = False) -> None:
+        pud = self._GPIO.PUD_UP if pull_up else self._GPIO.PUD_DOWN
+        self._GPIO.setup(pin, self._GPIO.IN, pull_up_down=pud)
+
+    def setup_pwm(self, pin: int, frequency_hz: int) -> RpiPwmHandle:
+        self._GPIO.setup(pin, self._GPIO.OUT)
+        return RpiPwmHandle(self._GPIO.PWM(pin, frequency_hz))
+
+    def write(self, pin: int, value: bool) -> None:
+        self._GPIO.output(pin, self._GPIO.HIGH if value else self._GPIO.LOW)
+
+    def read(self, pin: int) -> bool:
+        return bool(self._GPIO.input(pin))
+
+    def attach_interrupt(self, pin: int, edge: str, callback) -> None:
+        self._GPIO.add_event_detect(pin, self._EDGE[edge], callback=callback, bouncetime=2)
+
+    def cleanup(self) -> None:
+        self._GPIO.cleanup()

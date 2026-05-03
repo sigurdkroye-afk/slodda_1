@@ -15,7 +15,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Int32MultiArray
-from .gpio_backend import StubGpioBackend
+from .gpio_backend import RpiGpioBackend
 
 # ── Robot geometry ─────────────────────────────────────────────────────────────
 WHEEL_BASE_M          = 0.256   # m  belt center-to-center separation (measured)
@@ -42,17 +42,17 @@ PID_HZ                = 20      # Hz — matches encoder publish rate
 WATCHDOG_HZ           = 10      # Hz
 CMD_VEL_TIMEOUT_SEC   = 0.5     # s  — stop if no /cmd_vel
 
-# ── GPIO pins (BCM numbering assumed) — TODO: fill in ─────────────────────────
-LEFT_PWM_PIN    = None  # TODO: EN pin for left H-bridge
-LEFT_DIR_PIN_A  = None  # TODO: IN1 for left H-bridge
-LEFT_DIR_PIN_B  = None  # TODO: IN2 for left H-bridge
-RIGHT_PWM_PIN   = None  # TODO: EN pin for right H-bridge
-RIGHT_DIR_PIN_A = None  # TODO: IN1 for right H-bridge
-RIGHT_DIR_PIN_B = None  # TODO: IN2 for right H-bridge
-LEFT_ENC_A_PIN  = None  # TODO: left encoder channel A
-LEFT_ENC_B_PIN  = None  # TODO: left encoder channel B (optional, for direction)
-RIGHT_ENC_A_PIN = None  # TODO: right encoder channel A
-RIGHT_ENC_B_PIN = None  # TODO: right encoder channel B (optional)
+# ── GPIO pins (BCM numbering) — DFR0601, Motor 1 = left, Motor 2 = right ──────
+LEFT_PWM_PIN    = 18   # P1
+LEFT_DIR_PIN_A  = 23   # A1
+LEFT_DIR_PIN_B  = 24   # B1
+RIGHT_PWM_PIN   = 19   # P2
+RIGHT_DIR_PIN_A = 25   # A2
+RIGHT_DIR_PIN_B = 26   # B2
+LEFT_ENC_A_PIN  = None  # encoder not yet wired
+LEFT_ENC_B_PIN  = None
+RIGHT_ENC_A_PIN = None
+RIGHT_ENC_B_PIN = None
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
@@ -87,10 +87,7 @@ class MotorDriverNode(Node):
         super().__init__('motor_driver')
         self._declare_params()
 
-        self.gpio = StubGpioBackend(log_fn=lambda msg: self.get_logger().debug(msg))
-        self.get_logger().warn(
-            'StubGpioBackend active — motors will NOT move. '
-            'Fill in GPIO pin constants and swap backend for hardware use.')
+        self.gpio = RpiGpioBackend()
 
         self._left_dir  = True  # True = forward
         self._right_dir = True
