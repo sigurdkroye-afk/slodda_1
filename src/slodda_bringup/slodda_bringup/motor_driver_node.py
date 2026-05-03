@@ -15,7 +15,7 @@ import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist
 from std_msgs.msg import Int32MultiArray
-from .gpio_backend import RpiGpioBackend
+from .gpio_backend import LgpioBackend
 
 # ── Robot geometry ─────────────────────────────────────────────────────────────
 WHEEL_BASE_M          = 0.256   # m  belt center-to-center separation (measured)
@@ -87,7 +87,7 @@ class MotorDriverNode(Node):
         super().__init__('motor_driver')
         self._declare_params()
 
-        self.gpio = RpiGpioBackend()
+        self.gpio = LgpioBackend()
 
         self._left_dir  = True  # True = forward
         self._right_dir = True

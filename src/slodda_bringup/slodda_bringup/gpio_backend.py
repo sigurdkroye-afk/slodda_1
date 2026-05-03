@@ -127,3 +127,59 @@ class RpiGpioBackend(GpioBackend):
 
     def cleanup(self) -> None:
         self._GPIO.cleanup()
+
+
+class LgpioPwmHandle(PwmHandle):
+    def __init__(self, handle, pin: int, frequency_hz: int):
+        self._h = handle
+        self._pin = pin
+        self._freq = frequency_hz
+
+    def start(self, duty_percent: float) -> None:
+        import lgpio
+        lgpio.tx_pwm(self._h, self._pin, self._freq, duty_percent)
+
+    def set_duty(self, duty_percent: float) -> None:
+        import lgpio
+        lgpio.tx_pwm(self._h, self._pin, self._freq, duty_percent)
+
+    def stop(self) -> None:
+        import lgpio
+        lgpio.tx_pwm(self._h, self._pin, 0, 0)
+
+
+class LgpioBackend(GpioBackend):
+    """lgpio backend — uses /dev/gpiochip0, no root required (user must be in dialout group)."""
+
+    def __init__(self, chip: int = 0):
+        import lgpio
+        self._lg = lgpio
+        self._h = lgpio.gpiochip_open(chip)
+        self._EDGE = {
+            'rising':  lgpio.RISING_EDGE,
+            'falling': lgpio.FALLING_EDGE,
+            'both':    lgpio.BOTH_EDGES,
+        }
+
+    def setup_output(self, pin: int) -> None:
+        self._lg.gpio_claim_output(self._h, pin, 0)
+
+    def setup_input(self, pin: int, pull_up: bool = False) -> None:
+        flags = self._lg.SET_BIAS_PULL_UP if pull_up else self._lg.SET_BIAS_DISABLE
+        self._lg.gpio_claim_input(self._h, pin, flags)
+
+    def setup_pwm(self, pin: int, frequency_hz: int) -> LgpioPwmHandle:
+        self._lg.gpio_claim_output(self._h, pin, 0)
+        return LgpioPwmHandle(self._h, pin, frequency_hz)
+
+    def write(self, pin: int, value: bool) -> None:
+        self._lg.gpio_write(self._h, pin, 1 if value else 0)
+
+    def read(self, pin: int) -> bool:
+        return bool(self._lg.gpio_read(self._h, pin))
+
+    def attach_interrupt(self, pin: int, edge: str, callback) -> None:
+        self._lg.callback(self._h, pin, self._EDGE[edge], callback)
+
+    def cleanup(self) -> None:
+        self._lg.gpiochip_close(self._h)
