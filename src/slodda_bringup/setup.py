@@ -40,6 +40,8 @@ setup(
             'control_panel = slodda_bringup.control_panel:main',
             'camera_control_panel = slodda_bringup.camera_control_panel:main',
             'motor_driver = slodda_bringup.motor_driver_node:main',
+            'odometry_node = slodda_bringup.odometry_node:main',
+            'imu_node = slodda_bringup.imu_node:main',
         ],
     },
 )

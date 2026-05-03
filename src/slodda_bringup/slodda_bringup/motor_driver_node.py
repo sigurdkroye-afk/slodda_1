@@ -9,6 +9,7 @@ Fill in the TODO pin constants before running on hardware.
 Swap StubGpioBackend for a concrete GpioBackend subclass once your GPIO
 library is chosen (RPi.GPIO, gpiozero, lgpio, pigpio, …).
 """
+import math
 import threading
 import rclpy
 from rclpy.node import Node
@@ -17,9 +18,10 @@ from std_msgs.msg import Int32MultiArray
 from .gpio_backend import StubGpioBackend
 
 # ── Robot geometry ─────────────────────────────────────────────────────────────
-WHEEL_BASE_M          = 0.18    # m  (distance between wheel centres) — verify!
-WHEEL_RADIUS_M        = 0.034   # m  — verify!
+WHEEL_BASE_M          = 0.256   # m  belt center-to-center separation (measured)
+WHEEL_RADIUS_M        = 0.0208  # m  drive sprocket radius (measured)
 ENCODER_TICKS_PER_REV = 663     # GB37Y3530: 11PPR * 2 edges * 30.15 ratio ≈ 663
+METRES_PER_TICK       = 2.0 * math.pi * WHEEL_RADIUS_M / ENCODER_TICKS_PER_REV
 
 # ── PWM ────────────────────────────────────────────────────────────────────────
 PWM_FREQUENCY_HZ      = 1000    # Hz
@@ -28,8 +30,15 @@ MAX_PWM               = 95.0    # %
 MAX_WHEEL_SPEED_MPS   = 0.5     # m/s at 100% duty (full-scale reference)
 VELOCITY_DEADBAND_MPS = 0.01    # m/s — below this → PWM=0
 
+# ── PID — start tuning with Ki=Kd=0 until Kp response looks stable ────────────
+PID_KP             = 30.0   # %PWM per (m/s error)
+PID_KI             = 5.0    # %PWM per (m/s · s)
+PID_KD             = 0.5    # %PWM per (m/s / s)
+PID_MAX_CORRECTION = 20.0   # % — bounds correction so feedforward dominates
+
 # ── Loop rates ─────────────────────────────────────────────────────────────────
 ENCODER_PUBLISH_HZ    = 20      # Hz
+PID_HZ                = 20      # Hz — matches encoder publish rate
 WATCHDOG_HZ           = 10      # Hz
 CMD_VEL_TIMEOUT_SEC   = 0.5     # s  — stop if no /cmd_vel
 
@@ -50,6 +59,29 @@ def _clamp(v: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, v))
 
 
+class _WheelPID:
+    """Velocity PID with anti-windup for one wheel."""
+
+    def __init__(self, kp: float, ki: float, kd: float):
+        self.kp, self.ki, self.kd = kp, ki, kd
+        self._integral = 0.0
+        self._prev_err = 0.0
+
+    def reset(self):
+        self._integral = 0.0
+        self._prev_err = 0.0
+
+    def step(self, error: float, dt: float, out_min: float, out_max: float) -> float:
+        self._integral += error * dt
+        d = (error - self._prev_err) / dt if dt > 0.0 else 0.0
+        self._prev_err = error
+        out = self.kp * error + self.ki * self._integral + self.kd * d
+        clamped = _clamp(out, out_min, out_max)
+        if clamped != out:
+            self._integral -= error * dt  # anti-windup: undo when saturated
+        return clamped
+
+
 class MotorDriverNode(Node):
     def __init__(self):
         super().__init__('motor_driver')
@@ -66,6 +98,14 @@ class MotorDriverNode(Node):
         self.right_ticks = 0
         self._tick_lock  = threading.Lock()
 
+        self._target_left  = 0.0  # m/s target set by cmd_vel
+        self._target_right = 0.0
+        self._pid_left     = _WheelPID(PID_KP, PID_KI, PID_KD)
+        self._pid_right    = _WheelPID(PID_KP, PID_KI, PID_KD)
+        self._pid_prev_left  = 0
+        self._pid_prev_right = 0
+        self._pid_last_time  = self.get_clock().now()
+
         self._setup_pins()
         self._left_pwm  = self.gpio.setup_pwm(LEFT_PWM_PIN,  PWM_FREQUENCY_HZ)
         self._right_pwm = self.gpio.setup_pwm(RIGHT_PWM_PIN, PWM_FREQUENCY_HZ)
@@ -76,6 +116,7 @@ class MotorDriverNode(Node):
         self.create_subscription(Twist, '/cmd_vel', self._cmd_cb, 10)
         self.tick_pub = self.create_publisher(Int32MultiArray, '/encoder_ticks', 10)
         self.create_timer(1.0 / ENCODER_PUBLISH_HZ, self._publish_ticks)
+        self.create_timer(1.0 / PID_HZ,             self._pid_step)
         self.create_timer(1.0 / WATCHDOG_HZ,        self._watchdog)
 
         self.last_cmd_time = self.get_clock().now()
@@ -88,6 +129,9 @@ class MotorDriverNode(Node):
         self.declare_parameter('max_pwm',               MAX_PWM)
         self.declare_parameter('velocity_deadband_mps', VELOCITY_DEADBAND_MPS)
         self.declare_parameter('cmd_vel_timeout_sec',   CMD_VEL_TIMEOUT_SEC)
+        self.declare_parameter('pid_kp',                PID_KP)
+        self.declare_parameter('pid_ki',                PID_KI)
+        self.declare_parameter('pid_kd',                PID_KD)
 
     def _setup_pins(self):
         for pin in [LEFT_DIR_PIN_A, LEFT_DIR_PIN_B,
@@ -105,34 +149,70 @@ class MotorDriverNode(Node):
         if RIGHT_ENC_A_PIN is not None:
             self.gpio.attach_interrupt(RIGHT_ENC_A_PIN, 'rising', self._on_right_tick)
 
-    # ── cmd_vel handler ────────────────────────────────────────────────────────
+    # ── cmd_vel handler — stores targets only, PID loop drives PWM ────────────
 
     def _cmd_cb(self, msg: Twist):
         self.last_cmd_time = self.get_clock().now()
         wb = self.get_parameter('wheel_base_m').value
-        v_left  = msg.linear.x - msg.angular.z * wb / 2.0
-        v_right = msg.linear.x + msg.angular.z * wb / 2.0
-        self._drive_wheel('left',  v_left)
-        self._drive_wheel('right', v_right)
+        self._target_left  = msg.linear.x - msg.angular.z * wb / 2.0
+        self._target_right = msg.linear.x + msg.angular.z * wb / 2.0
 
-    def _drive_wheel(self, side: str, v_mps: float):
+    # ── PID control loop ───────────────────────────────────────────────────────
+
+    def _pid_step(self):
+        now = self.get_clock().now()
+        dt  = (now - self._pid_last_time).nanoseconds / 1e9
+        self._pid_last_time = now
+        if dt <= 0.0:
+            return
+
+        with self._tick_lock:
+            cur_left  = self.left_ticks
+            cur_right = self.right_ticks
+
+        actual_left  = (cur_left  - self._pid_prev_left)  * METRES_PER_TICK / dt
+        actual_right = (cur_right - self._pid_prev_right) * METRES_PER_TICK / dt
+        self._pid_prev_left  = cur_left
+        self._pid_prev_right = cur_right
+
+        self._pid_left.kp  = self._pid_right.kp  = self.get_parameter('pid_kp').value
+        self._pid_left.ki  = self._pid_right.ki  = self.get_parameter('pid_ki').value
+        self._pid_left.kd  = self._pid_right.kd  = self.get_parameter('pid_kd').value
+
+        for side, target, actual, pid in (
+            ('left',  self._target_left,  actual_left,  self._pid_left),
+            ('right', self._target_right, actual_right, self._pid_right),
+        ):
+            ff   = self._vel_to_signed_duty(target)
+            corr = pid.step(target - actual, dt, -PID_MAX_CORRECTION, PID_MAX_CORRECTION)
+            self._apply_signed_duty(side, ff + corr)
+
+    # ── Helpers ────────────────────────────────────────────────────────────────
+
+    def _vel_to_signed_duty(self, v_mps: float) -> float:
+        """Feedforward: velocity → signed PWM duty (negative = reverse)."""
         db   = self.get_parameter('velocity_deadband_mps').value
         vmax = self.get_parameter('max_wheel_speed_mps').value
         pmin = self.get_parameter('min_pwm').value
         pmax = self.get_parameter('max_pwm').value
+        if abs(v_mps) < db:
+            return 0.0
+        mag  = _clamp(abs(v_mps) / vmax, 0.0, 1.0)
+        duty = pmin + mag * (pmax - pmin)
+        return duty if v_mps >= 0.0 else -duty
 
-        forward = v_mps >= 0.0
+    def _apply_signed_duty(self, side: str, signed_duty: float):
+        """Sign → direction pins, magnitude → PWM duty."""
+        pmax    = self.get_parameter('max_pwm').value
+        pmin    = self.get_parameter('min_pwm').value
+        forward = signed_duty >= 0.0
+        duty    = _clamp(abs(signed_duty), 0.0, pmax)
+        if duty < pmin:
+            duty = 0.0
         if side == 'left':
             self._left_dir = forward
         else:
             self._right_dir = forward
-
-        if abs(v_mps) < db:
-            duty = 0.0
-        else:
-            mag  = _clamp(abs(v_mps) / vmax, 0.0, 1.0)
-            duty = pmin + mag * (pmax - pmin)
-
         self._set_direction(side, forward)
         pwm = self._left_pwm if side == 'left' else self._right_pwm
         pwm.set_duty(duty)
@@ -172,6 +252,10 @@ class MotorDriverNode(Node):
         timeout = self.get_parameter('cmd_vel_timeout_sec').value
         dt = (self.get_clock().now() - self.last_cmd_time).nanoseconds / 1e9
         if dt > timeout:
+            self._target_left  = 0.0
+            self._target_right = 0.0
+            self._pid_left.reset()
+            self._pid_right.reset()
             self._left_pwm.set_duty(0.0)
             self._right_pwm.set_duty(0.0)
 
