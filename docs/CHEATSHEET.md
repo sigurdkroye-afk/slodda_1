@@ -241,13 +241,66 @@ df -h
 ## Real Robot Launch
 
 ```bash
-# On the Pi:
-source ~/slodda_1/install/setup.bash
-ros2 launch slodda_bringup real_robot.launch.py
+# SSH inn på Pi:
+ssh slodda1@SloddaPi.local
 
-# Visualise on laptop:
-export ROS_DOMAIN_ID=42
-ros2 launch slodda_description view_real_robot.launch.py
+# Full hardware stack (Nav2 + LiDAR + IMU + motorer):
+source /opt/ros/kilted/setup.bash
+source ~/slodda_1/install/setup.bash
+ros2 launch slodda_bringup hardware.launch.py
+
+# Bare motorer (for testing uten Nav2):
+ros2 launch slodda_bringup motors_only.launch.py
+
+# Keyboard control (på din maskin):
+ros2 run teleop_twist_keyboard teleop_twist_keyboard
+```
+
+Vent på: `[lifecycle_manager_navigation]: Managed nodes are active` (~3 min på Pi)
+
+---
+
+## Hardware — GPIO Pin Mapping (DFR0601)
+
+| Signal | GPIO (BCM) | DFR0601 pin |
+|---|---|---|
+| Venstre motor PWM | 18 | P1 |
+| Venstre motor dir A | 23 | A1 |
+| Venstre motor dir B | 24 | B1 |
+| Høyre motor PWM | 19 | P2 |
+| Høyre motor dir A | 26 | B2 (invertert) |
+| Høyre motor dir B | 25 | A2 |
+
+LiDAR (LD06): GPIO4=TX, GPIO5=RX → `/dev/ttyAMA3`
+IMU (BNO085): GPIO2=SDA, GPIO3=SCL → I2C1, adresse `0x4a`
+
+---
+
+## Pi — Første gangs oppsett (én gang)
+
+```bash
+# Aktiver UART3 (LiDAR) og I2C (IMU):
+echo "dtoverlay=uart3" | sudo tee -a /boot/firmware/config.txt
+echo "dtparam=i2c_arm=on" | sudo tee -a /boot/firmware/config.txt
+sudo reboot
+
+# Verifiser etter reboot:
+ls /dev/ttyAMA3        # LiDAR port
+i2cdetect -y 1         # skal vise 0x4a (IMU)
+
+# Installer Python-avhengigheter:
+pip install lgpio adafruit-blinka adafruit-circuitpython-bno08x --break-system-packages
+
+# Installer ROS-avhengigheter:
+sudo apt install -y ros-kilted-xacro ros-kilted-robot-localization \
+  ros-kilted-nav2-amcl ros-kilted-nav2-behaviors ros-kilted-nav2-bt-navigator \
+  ros-kilted-nav2-controller ros-kilted-nav2-lifecycle-manager \
+  ros-kilted-nav2-map-server ros-kilted-nav2-planner ros-kilted-nav2-smoother \
+  ros-kilted-robot-state-publisher i2c-tools
+
+# Bygg workspace (ekskluder desktop-pakker):
+cd ~/slodda_1 && git pull
+colcon build --symlink-install --packages-ignore slodda_rviz_panel slodda_vision
 ```
 
 ---

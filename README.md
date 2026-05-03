@@ -150,12 +150,29 @@ ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{}"
 
 ## Quick Start — Real Robot (Raspberry Pi)
 
-See [`docs/RASPBERRY_PI_SETUP.md`](docs/RASPBERRY_PI_SETUP.md) for full setup.
+See [`docs/RASPBERRY_PI_SETUP.md`](docs/RASPBERRY_PI_SETUP.md) for full setup. See [`docs/CHEATSHEET.md`](docs/CHEATSHEET.md) for GPIO pin mapping and first-time Pi setup.
+
+### Hardware
+
+| Sensor/Aktuator | Tilkobling |
+|---|---|
+| Motorer (DFR0601) | GPIO 18/19 (PWM), 23/24 (venstre dir), 25/26 (høyre dir) |
+| LiDAR LD06 | GPIO 4/5 → UART3 (`/dev/ttyAMA3`) |
+| IMU BNO085 | GPIO 2/3 → I2C1, adresse `0x4a` |
+
+### Launch
 
 ```bash
-# On the Pi:
+# SSH:
+ssh slodda1@SloddaPi.local
+
+# Full stack:
+source /opt/ros/kilted/setup.bash
 source ~/slodda_1/install/setup.bash
-ros2 launch slodda_bringup real_robot.launch.py
+ros2 launch slodda_bringup hardware.launch.py
+
+# Bare motorer (testing):
+ros2 launch slodda_bringup motors_only.launch.py
 
 # On your laptop (same WiFi, same ROS_DOMAIN_ID):
 export ROS_DOMAIN_ID=42
