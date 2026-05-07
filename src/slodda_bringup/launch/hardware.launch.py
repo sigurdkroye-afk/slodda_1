@@ -2,7 +2,7 @@ import os
 import xacro
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
+from launch.actions import DeclareLaunchArgument, TimerAction
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
@@ -11,28 +11,21 @@ from launch_ros.actions import Node
 def generate_launch_description():
     pkg_bringup     = get_package_share_directory('slodda_bringup')
     pkg_description = get_package_share_directory('slodda_description')
-    pkg_gazebo      = get_package_share_directory('slodda_gazebo')
 
-    nav2_params = os.path.join(pkg_bringup,  'config', 'nav2_params.yaml')
-    ekf_params  = os.path.join(pkg_bringup,  'config', 'ekf.yaml')
-    map_default = os.path.join(pkg_gazebo,   'maps',   'arena_map.yaml')
-    rviz_config = os.path.join(pkg_bringup,  'config', 'nav2.rviz')
+    nav2_params = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
+    ekf_params  = os.path.join(pkg_bringup, 'config', 'ekf.yaml')
+    rviz_config = os.path.join(pkg_bringup, 'config', 'hardware.rviz')
 
-    xacro_file       = os.path.join(pkg_description, 'urdf', 'slodda_real.urdf.xacro')
+    xacro_file        = os.path.join(pkg_description, 'urdf', 'slodda_real.urdf.xacro')
     robot_description = xacro.process_file(xacro_file).toxml()
 
     hw = {'use_sim_time': False}
 
-    # ── Launch arguments ──────────────────────────────────────────────────────
-    map_arg = DeclareLaunchArgument(
-        'map', default_value=map_default,
-        description='Full path to map yaml file')
-
     rviz_arg = DeclareLaunchArgument(
         'rviz', default_value='false',
-        description='Launch RViz for debugging (true/false)')
+        description='Launch RViz (true/false)')
 
-    # ── Robot description ─────────────────────────────────────────────────────
+    # ── Phase 1 (t=0): Hardware drivers ───────────────────────────────────────
     robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -40,9 +33,6 @@ def generate_launch_description():
         parameters=[hw, {'robot_description': robot_description}]
     )
 
-    # ── Hardware drivers ──────────────────────────────────────────────────────
-
-    # LD06 LiDAR — adjust port_name if the device appears elsewhere
     lidar_node = Node(
         package='ldlidar_stl_ros2',
         executable='ldlidar_stl_ros2_node',
@@ -51,7 +41,7 @@ def generate_launch_description():
         parameters=[
             {'product_name': 'LDLiDAR_LD06'},
             {'topic_name': 'scan'},
-            {'frame_id': 'lidar_link'},      # matches URDF — no extra TF needed
+            {'frame_id': 'lidar_link'},
             {'port_name': '/dev/ttyAMA3'},
             {'port_baudrate': 230400},
             {'laser_scan_dir': True},
@@ -59,15 +49,11 @@ def generate_launch_description():
         ]
     )
 
-    # BNO085 IMU — pip install adafruit-circuitpython-bno08x adafruit-blinka on Pi
     imu_node = Node(
         package='slodda_bringup',
         executable='imu_node',
         output='screen',
-        parameters=[hw, {
-            'publish_hz': 50.0,
-            'frame_id':   'imu_link',
-        }]
+        parameters=[hw, {'publish_hz': 10.0, 'frame_id': 'imu_link'}]
     )
 
     motor_driver = Node(
@@ -84,6 +70,19 @@ def generate_launch_description():
         }]
     )
 
+    # Static map→odom identity transform.
+    # This gives Nav2 a valid map frame immediately without AMCL or SLAM.
+    # The robot starts at map origin (0,0,0). Odometry drift will accumulate
+    # over time but navigation works correctly for demos and testing.
+    map_odom_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='map_to_odom',
+        output='screen',
+        arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+    )
+
+    # ── Phase 2 (t=4s): Odometry + EKF ───────────────────────────────────────
     odometry_node = Node(
         package='slodda_bringup',
         executable='odometry_node',
@@ -92,11 +91,10 @@ def generate_launch_description():
             'wheel_radius_m': 0.0208,
             'wheel_base_m':   0.256,
             'ticks_per_rev':  663.0,
-            'publish_tf':     False,  # EKF publishes odom → base_footprint TF
+            'publish_tf':     False,
         }]
     )
 
-    # ── EKF — fuses /odom + /imu/data ────────────────────────────────────────
     ekf_node = Node(
         package='robot_localization',
         executable='ekf_node',
@@ -105,22 +103,7 @@ def generate_launch_description():
         parameters=[ekf_params, hw]
     )
 
-    # ── Nav2 ──────────────────────────────────────────────────────────────────
-    map_server = Node(
-        package='nav2_map_server',
-        executable='map_server',
-        output='screen',
-        parameters=[hw, nav2_params,
-                    {'yaml_filename': LaunchConfiguration('map')}]
-    )
-
-    amcl = Node(
-        package='nav2_amcl',
-        executable='amcl',
-        output='screen',
-        parameters=[hw, nav2_params]
-    )
-
+    # ── Phase 3 (t=10s): Nav2 servers ─────────────────────────────────────────
     controller_server = Node(
         package='nav2_controller',
         executable='controller_server',
@@ -157,19 +140,7 @@ def generate_launch_description():
         parameters=[hw, nav2_params]
     )
 
-    lifecycle_manager_localization = Node(
-        package='nav2_lifecycle_manager',
-        executable='lifecycle_manager',
-        name='lifecycle_manager_localization',
-        output='screen',
-        parameters=[{
-            'use_sim_time': False,
-            'autostart': True,
-            'node_names': ['map_server', 'amcl'],
-            'bond_timeout': 0.0,
-        }]
-    )
-
+    # ── Phase 4 (t=20s): Lifecycle manager ────────────────────────────────────
     lifecycle_manager_navigation = Node(
         package='nav2_lifecycle_manager',
         executable='lifecycle_manager',
@@ -185,11 +156,10 @@ def generate_launch_description():
                 'behavior_server',
                 'bt_navigator',
             ],
-            'bond_timeout': 0.0,
+            'bond_timeout': 20.0,
         }]
     )
 
-    # ── RViz (optional, enable with rviz:=true) ───────────────────────────────
     rviz = Node(
         package='rviz2',
         executable='rviz2',
@@ -200,22 +170,38 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
-        map_arg,
         rviz_arg,
+        # Phase 1: immediate
         robot_state_publisher,
         lidar_node,
         imu_node,
         motor_driver,
-        odometry_node,
-        ekf_node,
-        map_server,
-        amcl,
-        controller_server,
-        planner_server,
-        smoother_server,
-        behavior_server,
-        bt_navigator,
-        lifecycle_manager_localization,
-        lifecycle_manager_navigation,
+        map_odom_tf,
+        # Phase 2: t=4s
+        TimerAction(period=4.0, actions=[
+            odometry_node,
+            ekf_node,
+        ]),
+        # Phase 3: t=10s
+        TimerAction(period=10.0, actions=[
+            controller_server,
+            planner_server,
+            smoother_server,
+            behavior_server,
+            bt_navigator,
+        ]),
+        # Phase 4: t=20s
+        TimerAction(period=20.0, actions=[
+            lifecycle_manager_navigation,
+        ]),
+        # Phase 5: t=35s — after Nav2 is fully active
+        TimerAction(period=35.0, actions=[
+            Node(
+                package='slodda_bringup',
+                executable='camera_node',
+                output='screen',
+                parameters=[hw],
+            ),
+        ]),
         rviz,
     ])

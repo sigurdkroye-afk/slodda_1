@@ -1,34 +1,33 @@
 ekf_filter_node:
   ros__parameters:
-    frequency: 25.0
-    sensor_timeout: 0.1
-    two_d_mode: true        # planar robot — ignore roll/pitch/z
-    publish_tf: true        # EKF owns odom → base_footprint TF (odometry_node publish_tf: false)
+    frequency: 10.0
+    sensor_timeout: 0.3
+    two_d_mode: true
+    transform_timeout: 0.1
+    publish_tf: true
     publish_acceleration: false
+    print_diagnostics: false
 
     map_frame:       map
     odom_frame:      odom
     base_link_frame: base_footprint
     world_frame:     odom
 
-    # ── Wheel odometry (/odom from odometry_node) ────────────────────────────
+    # Wheel odometry — fuse velocities only (not absolute pose, which drifts)
     # Fields: [x,  y,  z,  roll,  pitch, yaw,  vx,  vy,   vz,
     #          vroll, vpitch, vyaw, ax, ay, az]
     odom0: /odom
-    odom0_config: [true,  true,  false,
-                   false, false, true,
+    odom0_config: [false, false, false,
+                   false, false, false,
                    true,  false, false,
                    false, false, true,
                    false, false, false]
     odom0_differential: false
     odom0_relative: false
-    odom0_queue_size: 10
+    odom0_queue_size: 5
+    odom0_nodelay: true
 
-    # ── IMU — BNO085 (/imu/data) ─────────────────────────────────────────────
-    # Only fuse yaw rate (gyro).  Absolute yaw from magnetometer is disabled
-    # because tracked robots sit close to metal motors — mag interference is
-    # likely.  To enable absolute yaw, set index 5 (yaw) to true and verify
-    # that the heading is stable when the robot is stationary.
+    # IMU — BNO085, fuse yaw rate only
     imu0: /imu/data
     imu0_config: [false, false, false,
                   false, false, false,
@@ -38,4 +37,5 @@ ekf_filter_node:
     imu0_differential: false
     imu0_relative: false
     imu0_remove_gravitational_acceleration: true
-    imu0_queue_size: 10
+    imu0_queue_size: 5
+    imu0_nodelay: true
