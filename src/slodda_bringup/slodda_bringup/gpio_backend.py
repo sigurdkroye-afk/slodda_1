@@ -155,6 +155,7 @@ class LgpioBackend(GpioBackend):
         import lgpio
         self._lg = lgpio
         self._h = lgpio.gpiochip_open(chip)
+        self._callbacks = []  # must retain; GC cancels lgpio callbacks
         self._EDGE = {
             'rising':  lgpio.RISING_EDGE,
             'falling': lgpio.FALLING_EDGE,
@@ -179,7 +180,11 @@ class LgpioBackend(GpioBackend):
         return bool(self._lg.gpio_read(self._h, pin))
 
     def attach_interrupt(self, pin: int, edge: str, callback) -> None:
-        self._lg.callback(self._h, pin, self._EDGE[edge], callback)
+        cb = self._lg.callback(self._h, pin, self._EDGE[edge], callback)
+        self._callbacks.append(cb)
 
     def cleanup(self) -> None:
+        for cb in self._callbacks:
+            cb.cancel()
+        self._callbacks.clear()
         self._lg.gpiochip_close(self._h)
