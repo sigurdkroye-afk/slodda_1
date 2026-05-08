@@ -6,7 +6,7 @@ ekf_filter_node:
     frequency: 5.0
     sensor_timeout: 0.5
     two_d_mode: true
-    transform_timeout: 0.1
+    transform_timeout: 0.5    # raised from 0.1 — at 5Hz, 0.1s expires before next update
     publish_tf: true
     publish_acceleration: false
     print_diagnostics: false
@@ -16,13 +16,17 @@ ekf_filter_node:
     base_link_frame: base_footprint
     world_frame:     odom
 
-    # Wheel odometry — encoders now wired (GPIO 17/27 left, 22/5 right).
-    # Fuse vx (forward velocity) and vyaw. Not absolute pose — it drifts.
+    # Wheel odometry — fuse FORWARD VELOCITY ONLY (vx).
+    # Encoder vyaw DISABLED: tracks slip laterally during pivot, and
+    # motor_driver infers tick sign from commanded PWM direction (not actual
+    # movement), so manual rotation produces zero/wrong-sign vyaw and
+    # drags EKF yaw to zero, fighting the IMU gyro.
+    # IMU is the sole yaw source — more accurate for tracked robots.
     odom0: /odom
     odom0_config: [false, false, false,
                    false, false, false,
                    true,  false, false,
-                   false, false, true,
+                   false, false, false,
                    false, false, false]
     odom0_differential: false
     odom0_relative: false

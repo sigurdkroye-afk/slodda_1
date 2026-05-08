@@ -79,9 +79,9 @@ def generate_launch_description():
     )
 
     # ── Phase 2 (t=4s): Odometry + EKF ──────────────────────────────────────
-    # Encoders not wired → ticks always zero → EKF uses IMU yaw-rate only.
-    # This gives correct rotation tracking. X/Y position stays at zero until
-    # encoders are connected and odom0 is re-enabled in ekf.yaml.
+    # Encoder vyaw disabled in EKF — track slip + commanded-direction sign
+    # inference make wheel yaw unreliable on this tracked robot.
+    # EKF fuses encoder vx (forward velocity) + IMU gyro.z (yaw rate) only.
     odometry_node = Node(
         package='slodda_bringup',
         executable='odometry_node',
