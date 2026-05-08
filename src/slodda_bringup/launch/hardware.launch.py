@@ -173,6 +173,8 @@ def generate_launch_description():
             'bond_timeout': 60.0,
             'bond.heartbeat_period': 2.0,
             'bond.heartbeat_timeout': 30.0,
+            'attempt_respawn_reconnection': True,
+            'bond_respawn_max_duration': 30.0,
         }]
     )
 
@@ -202,16 +204,19 @@ def generate_launch_description():
         TimerAction(period=6.0, actions=[
             map_odom_tf,
         ]),
-        # Phase 4: t=12s — Nav2 servers
+        # Phase 4a: t=12s — heavy Nav2 servers (each has costmap inside)
         TimerAction(period=12.0, actions=[
             controller_server,
             planner_server,
+        ]),
+        # Phase 4b: t=18s — lighter servers (no costmap)
+        TimerAction(period=18.0, actions=[
             smoother_server,
             behavior_server,
             bt_navigator,
         ]),
-        # Phase 5: t=22s — lifecycle manager activates Nav2
-        TimerAction(period=22.0, actions=[
+        # Phase 5: t=30s — lifecycle manager (extra margin after staggered init)
+        TimerAction(period=30.0, actions=[
             lifecycle_manager_navigation,
         ]),
         rviz,
