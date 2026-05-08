@@ -122,7 +122,10 @@ def main(args=None):
     panel.show()
 
     ros_timer = QTimer()
-    ros_timer.timeout.connect(lambda: rclpy.spin_once(node, timeout_sec=0))
+    def _spin():
+        if rclpy.ok():
+            rclpy.spin_once(node, timeout_sec=0)
+    ros_timer.timeout.connect(_spin)
     ros_timer.start(50)
 
     exit_code = app.exec_()
