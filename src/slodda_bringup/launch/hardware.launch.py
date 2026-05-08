@@ -13,7 +13,6 @@ def generate_launch_description():
     pkg_description = get_package_share_directory('slodda_description')
 
     nav2_params = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
-    slam_params = os.path.join(pkg_bringup, 'config', 'slam_params.yaml')
     rviz_config = os.path.join(pkg_bringup, 'config', 'hardware.rviz')
     bt_xml      = os.path.join(pkg_bringup, 'behavior_trees', 'navigate_to_pose_no_spin.xml')
 
@@ -86,15 +85,17 @@ def generate_launch_description():
         }]
     )
 
-    # ── Phase 3 (t=6s): SLAM toolbox ──────────────────────────────────────────
-    # Provides map→odom TF at 20Hz. Replaces static map→odom identity TF.
-    # Needs odom→base_footprint TF from odometry_node (started at t=4s).
-    slam_node = Node(
-        package='slam_toolbox',
-        executable='async_slam_toolbox_node',
-        name='slam_toolbox',
+    # ── Phase 3 (t=6s): Static map→odom TF ───────────────────────────────────
+    # Identity transform: robot starts at map origin.
+    # TODO: replace with slam_toolbox once scan-processing issue is debugged.
+    #   Current issue: slam_toolbox starts but never processes scans.
+    #   Suspected cause: tf2 MessageFilter drops scans — needs clean investigation.
+    map_odom_tf = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='map_to_odom',
         output='screen',
-        parameters=[slam_params, hw],
+        arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
     )
 
     # ── Phase 4 (t=12s): Nav2 servers ─────────────────────────────────────────
@@ -178,11 +179,11 @@ def generate_launch_description():
         TimerAction(period=4.0, actions=[
             odometry_node,
         ]),
-        # Phase 3: t=6s — SLAM (needs odom TF)
+        # Phase 3: t=6s — static map→odom TF
         TimerAction(period=6.0, actions=[
-            slam_node,
+            map_odom_tf,
         ]),
-        # Phase 4: t=12s — Nav2 servers (SLAM has 6s to start building map)
+        # Phase 4: t=12s — Nav2 servers
         TimerAction(period=12.0, actions=[
             controller_server,
             planner_server,
