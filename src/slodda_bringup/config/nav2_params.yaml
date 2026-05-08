@@ -48,7 +48,7 @@ controller_server:
       regulated_linear_scaling_min_radius: 0.9
       regulated_linear_scaling_min_speed: 0.1
       allow_reversing: false
-      transform_tolerance: 0.3
+      transform_tolerance: 1.0
       use_rotate_to_heading: false
 
 local_costmap:
@@ -62,7 +62,7 @@ local_costmap:
       # 0.3s tolerance at 30 Hz EKF = ~9 TF samples of margin.
       # Old value of 2.0s silently masked TF staleness — costmap would
       # use a 2-second-old yaw and plot scan obstacles in the wrong place.
-      transform_tolerance: 0.3
+      transform_tolerance: 1.0
       rolling_window: true
       width: 4
       height: 4
@@ -99,7 +99,7 @@ global_costmap:
       robot_base_frame: base_footprint
       robot_radius: 0.16
       resolution: 0.10
-      transform_tolerance: 0.3
+      transform_tolerance: 1.0
       rolling_window: false
       width: 20
       height: 20
@@ -162,7 +162,7 @@ behavior_server:
     local_frame: odom
     global_frame: map
     robot_base_frame: base_footprint
-    transform_tolerance: 0.3
+    transform_tolerance: 1.0
     simulate_ahead_time: 1.0
     max_rotational_vel: 1.0
     min_rotational_vel: 0.4
