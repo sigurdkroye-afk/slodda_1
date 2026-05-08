@@ -2,11 +2,10 @@ import sys
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from rclpy.action import ActionClient
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Empty
 from geometry_msgs.msg import Twist
-from nav2_msgs.action import NavigateToPose
+from action_msgs.srv import CancelGoal
 from nav2_msgs.srv import ClearEntireCostmap
 from cv_bridge import CvBridge
 
@@ -31,7 +30,8 @@ class _Node(Node):
         self._pub_home = self.create_publisher(Empty, '/mission/return_home', 10)
         self.create_subscription(Image, '/camera/image_raw', self._img_cb, qos_profile_sensor_data)
         self._zero_vel_pub = self.create_publisher(Twist, '/cmd_vel', 1)
-        self._nav_action = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+        self._cancel_nav_svc = self.create_client(
+            CancelGoal, '/navigate_to_pose/_action/cancel_goal')
         self._clear_local = self.create_client(
             ClearEntireCostmap, '/local_costmap/clear_entirely_local_costmap')
         self._clear_global = self.create_client(
@@ -55,10 +55,8 @@ class _Node(Node):
 
     def cancel_nav2(self):
         self._zero_vel_pub.publish(Twist())
-        try:
-            self._nav_action._cancel_all_goals_async()
-        except Exception as e:
-            self.get_logger().warn(f'cancel goal: {e}')
+        if self._cancel_nav_svc.service_is_ready():
+            self._cancel_nav_svc.call_async(CancelGoal.Request())
         for cli in (self._clear_local, self._clear_global):
             if cli.service_is_ready():
                 cli.call_async(ClearEntireCostmap.Request())

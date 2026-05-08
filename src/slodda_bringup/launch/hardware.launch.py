@@ -13,8 +13,9 @@ def generate_launch_description():
     pkg_description = get_package_share_directory('slodda_description')
 
     nav2_params = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
-    ekf_params  = os.path.join(pkg_bringup, 'config', 'ekf.yaml')
+    slam_params = os.path.join(pkg_bringup, 'config', 'slam_params.yaml')
     rviz_config = os.path.join(pkg_bringup, 'config', 'hardware.rviz')
+    bt_xml      = os.path.join(pkg_bringup, 'behavior_trees', 'navigate_to_pose_no_spin.xml')
 
     xacro_file        = os.path.join(pkg_description, 'urdf', 'slodda_real.urdf.xacro')
     robot_description = xacro.process_file(xacro_file).toxml()
@@ -70,19 +71,9 @@ def generate_launch_description():
         }]
     )
 
-    # Static map→odom identity transform.
-    # This gives Nav2 a valid map frame immediately without AMCL or SLAM.
-    # The robot starts at map origin (0,0,0). Odometry drift will accumulate
-    # over time but navigation works correctly for demos and testing.
-    map_odom_tf = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='map_to_odom',
-        output='screen',
-        arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
-    )
-
-    # ── Phase 2 (t=4s): Odometry + EKF ───────────────────────────────────────
+    # ── Phase 2 (t=4s): Odometry — publishes odom→base_footprint TF directly ──
+    # EKF removed: stalled 1–3s at 1Hz when Nav2 was active, causing TF gaps
+    # and message filter drops. Wheel-only odometry + SLAM is sufficient.
     odometry_node = Node(
         package='slodda_bringup',
         executable='odometry_node',
@@ -91,19 +82,22 @@ def generate_launch_description():
             'wheel_radius_m': 0.0208,
             'wheel_base_m':   0.256,
             'ticks_per_rev':  663.0,
-            'publish_tf':     False,
+            'publish_tf':     True,
         }]
     )
 
-    ekf_node = Node(
-        package='robot_localization',
-        executable='ekf_node',
-        name='ekf_filter_node',
+    # ── Phase 3 (t=6s): SLAM toolbox ──────────────────────────────────────────
+    # Provides map→odom TF at 20Hz. Replaces static map→odom identity TF.
+    # Needs odom→base_footprint TF from odometry_node (started at t=4s).
+    slam_node = Node(
+        package='slam_toolbox',
+        executable='async_slam_toolbox_node',
+        name='slam_toolbox',
         output='screen',
-        parameters=[ekf_params, hw]
+        parameters=[slam_params, hw],
     )
 
-    # ── Phase 3 (t=10s): Nav2 servers ─────────────────────────────────────────
+    # ── Phase 4 (t=12s): Nav2 servers ─────────────────────────────────────────
     controller_server = Node(
         package='nav2_controller',
         executable='controller_server',
@@ -133,14 +127,16 @@ def generate_launch_description():
         parameters=[hw, nav2_params]
     )
 
+    # bt_xml passed explicitly — $(find-pkg-share) in YAML is a launch substitution
+    # and is NOT resolved when the YAML is loaded as a --params-file at runtime.
     bt_navigator = Node(
         package='nav2_bt_navigator',
         executable='bt_navigator',
         output='screen',
-        parameters=[hw, nav2_params]
+        parameters=[hw, nav2_params, {'default_nav_to_pose_bt_xml': bt_xml}]
     )
 
-    # ── Phase 4 (t=20s): Lifecycle manager ────────────────────────────────────
+    # ── Phase 5 (t=22s): Lifecycle manager ────────────────────────────────────
     lifecycle_manager_navigation = Node(
         package='nav2_lifecycle_manager',
         executable='lifecycle_manager',
@@ -178,32 +174,25 @@ def generate_launch_description():
         lidar_node,
         imu_node,
         motor_driver,
-        map_odom_tf,
-        # Phase 2: t=4s
+        # Phase 2: t=4s — wheel odometry + TF
         TimerAction(period=4.0, actions=[
             odometry_node,
-            ekf_node,
         ]),
-        # Phase 3: t=10s
-        TimerAction(period=10.0, actions=[
+        # Phase 3: t=6s — SLAM (needs odom TF)
+        TimerAction(period=6.0, actions=[
+            slam_node,
+        ]),
+        # Phase 4: t=12s — Nav2 servers (SLAM has 6s to start building map)
+        TimerAction(period=12.0, actions=[
             controller_server,
             planner_server,
             smoother_server,
             behavior_server,
             bt_navigator,
         ]),
-        # Phase 4: t=20s
-        TimerAction(period=20.0, actions=[
+        # Phase 5: t=22s — lifecycle manager activates Nav2
+        TimerAction(period=22.0, actions=[
             lifecycle_manager_navigation,
-        ]),
-        # Phase 5: t=35s — after Nav2 is fully active
-        TimerAction(period=35.0, actions=[
-            Node(
-                package='slodda_bringup',
-                executable='camera_node',
-                output='screen',
-                parameters=[hw],
-            ),
         ]),
         rviz,
     ])
