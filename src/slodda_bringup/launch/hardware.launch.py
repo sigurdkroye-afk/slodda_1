@@ -13,6 +13,7 @@ def generate_launch_description():
     pkg_description = get_package_share_directory('slodda_description')
 
     nav2_params = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
+    ekf_params  = os.path.join(pkg_bringup, 'config', 'ekf.yaml')
     rviz_config = os.path.join(pkg_bringup, 'config', 'hardware.rviz')
     bt_xml      = os.path.join(pkg_bringup, 'behavior_trees', 'navigate_to_pose_no_spin.xml')
 
@@ -70,9 +71,10 @@ def generate_launch_description():
         }]
     )
 
-    # ── Phase 2 (t=4s): Odometry — publishes odom→base_footprint TF directly ──
-    # EKF removed: stalled 1–3s at 1Hz when Nav2 was active, causing TF gaps
-    # and message filter drops. Wheel-only odometry + SLAM is sufficient.
+    # ── Phase 2 (t=4s): Odometry + EKF ──────────────────────────────────────
+    # Encoders not wired → ticks always zero → EKF uses IMU yaw-rate only.
+    # This gives correct rotation tracking. X/Y position stays at zero until
+    # encoders are connected and odom0 is re-enabled in ekf.yaml.
     odometry_node = Node(
         package='slodda_bringup',
         executable='odometry_node',
@@ -81,8 +83,16 @@ def generate_launch_description():
             'wheel_radius_m': 0.0208,
             'wheel_base_m':   0.256,
             'ticks_per_rev':  663.0,
-            'publish_tf':     True,
+            'publish_tf':     False,  # EKF publishes odom→base_footprint TF
         }]
+    )
+
+    ekf_node = Node(
+        package='robot_localization',
+        executable='ekf_node',
+        name='ekf_filter_node',
+        output='screen',
+        parameters=[ekf_params, hw]
     )
 
     # ── Phase 3 (t=6s): Static map→odom TF ───────────────────────────────────
@@ -175,9 +185,10 @@ def generate_launch_description():
         lidar_node,
         imu_node,
         motor_driver,
-        # Phase 2: t=4s — wheel odometry + TF
+        # Phase 2: t=4s — odometry + EKF (IMU yaw fusion)
         TimerAction(period=4.0, actions=[
             odometry_node,
+            ekf_node,
         ]),
         # Phase 3: t=6s — static map→odom TF
         TimerAction(period=6.0, actions=[
