@@ -3,6 +3,7 @@ import time
 import threading
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from picamera2 import Picamera2
 
@@ -10,7 +11,7 @@ from picamera2 import Picamera2
 class CameraNode(Node):
     def __init__(self):
         super().__init__('camera_node')
-        self._pub = self.create_publisher(Image, '/camera/image_raw', 10)
+        self._pub = self.create_publisher(Image, '/camera/image_raw', qos_profile_sensor_data)
         self._frame = None
         self._lock = threading.Lock()
 
@@ -24,8 +25,8 @@ class CameraNode(Node):
         time.sleep(2)
 
         threading.Thread(target=self._capture_loop, daemon=True).start()
-        self.get_logger().info('Camera ready — publishing on /camera/image_raw at 4 Hz')
-        self.create_timer(0.25, self._publish)
+        self.get_logger().info('Camera ready — publishing on /camera/image_raw at 2 Hz')
+        self.create_timer(0.5, self._publish)
 
     def _capture_loop(self):
         while True:
@@ -33,7 +34,7 @@ class CameraNode(Node):
             bgr = cv2.cvtColor(raw, cv2.COLOR_BGRA2BGR)
             with self._lock:
                 self._frame = bgr
-            time.sleep(0.25)
+            time.sleep(0.5)
 
     def _publish(self):
         with self._lock:
