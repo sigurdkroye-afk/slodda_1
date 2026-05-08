@@ -34,6 +34,13 @@ def generate_launch_description():
         parameters=[hw, {'robot_description': robot_description}]
     )
 
+    joint_state_publisher = Node(
+        package='joint_state_publisher',
+        executable='joint_state_publisher',
+        output='screen',
+        parameters=[hw, {'robot_description': robot_description}]
+    )
+
     lidar_node = Node(
         package='ldlidar_stl_ros2',
         executable='ldlidar_stl_ros2_node',
@@ -182,6 +189,7 @@ def generate_launch_description():
         rviz_arg,
         # Phase 1: immediate
         robot_state_publisher,
+        joint_state_publisher,
         lidar_node,
         imu_node,
         motor_driver,
