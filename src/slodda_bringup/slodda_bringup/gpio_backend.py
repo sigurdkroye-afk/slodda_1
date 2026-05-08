@@ -165,7 +165,7 @@ class LgpioBackend(GpioBackend):
         self._lg.gpio_claim_output(self._h, pin, 0)
 
     def setup_input(self, pin: int, pull_up: bool = False) -> None:
-        flags = self._lg.SET_BIAS_PULL_UP if pull_up else self._lg.SET_BIAS_DISABLE
+        flags = self._lg.SET_PULL_UP if pull_up else self._lg.SET_PULL_NONE
         self._lg.gpio_claim_input(self._h, pin, flags)
 
     def setup_pwm(self, pin: int, frequency_hz: int) -> LgpioPwmHandle:
