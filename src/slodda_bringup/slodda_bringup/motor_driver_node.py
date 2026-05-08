@@ -52,7 +52,7 @@ RIGHT_DIR_PIN_B = 25   # A2
 LEFT_ENC_A_PIN  = 17   # Motor 1 Hall A
 LEFT_ENC_B_PIN  = 27   # Motor 1 Hall B
 RIGHT_ENC_A_PIN = 22   # Motor 2 Hall A
-RIGHT_ENC_B_PIN = 5    # Motor 2 Hall B
+RIGHT_ENC_B_PIN = 6    # Motor 2 Hall B
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
