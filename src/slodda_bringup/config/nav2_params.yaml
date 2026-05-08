@@ -10,7 +10,7 @@ bt_navigator:
 controller_server:
   ros__parameters:
     use_sim_time: false
-    controller_frequency: 5.0
+    controller_frequency: 3.0
     enable_stamped_cmd_vel: false
     progress_checker_plugins: ["progress_checker"]
     goal_checker_plugins: ["goal_checker"]
@@ -93,6 +93,8 @@ global_costmap:
       rolling_window: false
       width: 20
       height: 20
+      origin_x: -10.0
+      origin_y: -10.0
       plugins: ["obstacle_layer", "inflation_layer"]
       always_send_full_costmap: true
       obstacle_layer:
