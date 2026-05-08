@@ -1,3 +1,8 @@
+<!--
+  Nav2 Kilted default BT — Spin recovery removed.
+  Spin was causing behavior_server bond failures on Pi4.
+  Uses WouldAPlannerRecoveryHelp / WouldAControllerRecoveryHelp (Kilted nodes).
+-->
 <root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
     <RecoveryNode number_of_retries="6" name="NavigateRecovery">
@@ -22,7 +27,10 @@
         </RecoveryNode>
       </PipelineSequence>
       <Sequence>
-        <WouldANavRecoveryHelp error_code="{compute_path_error_code}"/>
+        <Fallback>
+          <WouldAControllerRecoveryHelp error_code="{follow_path_error_code}"/>
+          <WouldAPlannerRecoveryHelp error_code="{compute_path_error_code}"/>
+        </Fallback>
         <ReactiveFallback name="RecoveryFallback">
           <GoalUpdated/>
           <RoundRobin name="RecoveryActions">
@@ -30,8 +38,8 @@
               <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
               <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
             </Sequence>
-            <Wait wait_duration="2.0"/>
-            <BackUp backup_dist="0.15" backup_speed="0.05"/>
+            <Wait wait_duration="2.0" error_code_id="{wait_error_code}" error_msg="{wait_error_msg}"/>
+            <BackUp backup_dist="0.15" backup_speed="0.05" error_code_id="{backup_error_code}" error_msg="{backup_error_msg}"/>
           </RoundRobin>
         </ReactiveFallback>
       </Sequence>
