@@ -1,8 +1,13 @@
 import sys
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
+from rclpy.action import ActionClient
 from sensor_msgs.msg import Image
 from std_msgs.msg import Bool, Empty
+from geometry_msgs.msg import Twist
+from nav2_msgs.action import NavigateToPose
+from nav2_msgs.srv import ClearEntireCostmap
 from cv_bridge import CvBridge
 
 from PyQt5.QtWidgets import (
@@ -24,7 +29,13 @@ class _Node(Node):
         self._bridge = CvBridge()
         self._pub_approve = self.create_publisher(Bool, '/mission/approve', 10)
         self._pub_home = self.create_publisher(Empty, '/mission/return_home', 10)
-        self.create_subscription(Image, '/camera/image_raw', self._img_cb, 10)
+        self.create_subscription(Image, '/camera/image_raw', self._img_cb, qos_profile_sensor_data)
+        self._zero_vel_pub = self.create_publisher(Twist, '/cmd_vel', 1)
+        self._nav_action = ActionClient(self, NavigateToPose, 'navigate_to_pose')
+        self._clear_local = self.create_client(
+            ClearEntireCostmap, '/local_costmap/clear_entirely_local_costmap')
+        self._clear_global = self.create_client(
+            ClearEntireCostmap, '/global_costmap/clear_entirely_global_costmap')
 
     def _img_cb(self, msg):
         try:
@@ -41,6 +52,16 @@ class _Node(Node):
 
     def return_home(self):
         self._pub_home.publish(Empty())
+
+    def cancel_nav2(self):
+        self._zero_vel_pub.publish(Twist())
+        try:
+            self._nav_action._cancel_all_goals_async()
+        except Exception as e:
+            self.get_logger().warn(f'cancel goal: {e}')
+        for cli in (self._clear_local, self._clear_global):
+            if cli.service_is_ready():
+                cli.call_async(ClearEntireCostmap.Request())
 
 
 class HardwarePanel(QWidget):
@@ -74,6 +95,12 @@ class HardwarePanel(QWidget):
         btn_home.setStyleSheet('background: #4a4a9a; color: white; font-size: 12pt;')
         btn_home.clicked.connect(self._node.return_home)
         row.addWidget(btn_home)
+
+        btn_cancel = QPushButton('■ CANCEL NAV2')
+        btn_cancel.setMinimumHeight(40)
+        btn_cancel.setStyleSheet('background: #a02020; color: white; font-size: 12pt; font-weight: bold;')
+        btn_cancel.clicked.connect(self._node.cancel_nav2)
+        row.addWidget(btn_cancel)
 
         layout.addLayout(row)
 
