@@ -240,23 +240,34 @@ df -h
 
 ## Real Robot Launch
 
+**På Pi (`ssh slodda1@SloddaPi.local`):**
 ```bash
-# SSH inn på Pi:
-ssh slodda1@SloddaPi.local
-
-# Full hardware stack (Nav2 + LiDAR + IMU + motorer):
 source /opt/ros/kilted/setup.bash
 source ~/slodda_1/install/setup.bash
+
+# Full hardware stack (Nav2 + LiDAR + IMU + motorer + kamera):
 ros2 launch slodda_bringup hardware.launch.py
+
+# Med RViz på Pi (ikke anbefalt — tung på Pi):
+ros2 launch slodda_bringup hardware.launch.py rviz:=true
 
 # Bare motorer (for testing uten Nav2):
 ros2 launch slodda_bringup motors_only.launch.py
+```
 
-# Keyboard control (på din maskin):
+Kamera starter automatisk etter ~35s (etter at Nav2 er oppe).
+
+**På laptop** (RViz + hardware panel):
+```bash
+ros2 launch slodda_bringup laptop.launch.py
+```
+
+**Keyboard control:**
+```bash
 ros2 run teleop_twist_keyboard teleop_twist_keyboard
 ```
 
-Vent på: `[lifecycle_manager_navigation]: Managed nodes are active` (~3 min på Pi)
+Vent på: `[lifecycle_manager_navigation]: Managed nodes are active` (~35 s på Pi)
 
 ---
 
