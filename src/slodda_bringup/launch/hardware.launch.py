@@ -53,7 +53,7 @@ def generate_launch_description():
         package='slodda_bringup',
         executable='imu_node',
         output='screen',
-        parameters=[hw, {'publish_hz': 10.0, 'frame_id': 'imu_link'}]
+        parameters=[hw, {'publish_hz': 5.0, 'frame_id': 'imu_link'}]
     )
 
     motor_driver = Node(
@@ -156,7 +156,9 @@ def generate_launch_description():
                 'behavior_server',
                 'bt_navigator',
             ],
-            'bond_timeout': 20.0,
+            'bond_timeout': 60.0,
+            'bond.heartbeat_period': 2.0,
+            'bond.heartbeat_timeout': 30.0,
         }]
     )
 
