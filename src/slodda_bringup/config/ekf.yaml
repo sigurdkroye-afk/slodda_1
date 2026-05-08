@@ -1,9 +1,9 @@
 ekf_filter_node:
   ros__parameters:
-    # Pi4 CPU budget with Nav2: ~100ms per cycle is sustainable.
-    # 30 Hz (33ms budget) failed every cycle. 10 Hz (100ms budget) succeeds
-    # for typical loads; transform_tolerance 0.3s = 3 EKF cycles of margin.
-    frequency: 10.0
+    # Pi4 CPU budget with Nav2: 200ms per cycle is needed.
+    # 10 Hz (100ms) overruns 0.6-1.2s during Nav2 startup (Pi4 maxed).
+    # 5 Hz (200ms budget) leaves enough headroom; transform_tolerance=1.0s covers it.
+    frequency: 5.0
     sensor_timeout: 0.5
     two_d_mode: true
     transform_timeout: 0.1
