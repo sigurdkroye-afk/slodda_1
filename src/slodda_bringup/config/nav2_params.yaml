@@ -6,7 +6,11 @@ bt_navigator:
     odom_topic: /odom
     default_server_timeout: 20
     wait_for_service_timeout: 5000
+    # Nav2 Kilted uses pluginlib for navigators — each ID needs a .plugin param.
+    # get_plugin_type_param(node, "navigate_to_pose") → looks for navigate_to_pose.plugin
     navigators: ['navigate_to_pose']
+    navigate_to_pose:
+      plugin: 'nav2_bt_navigator::NavigateToPoseNavigator'
     # default_nav_to_pose_bt_xml is set via hardware.launch.py (absolute path)
     # — $(find-pkg-share) is a launch substitution, not a YAML substitution
 
