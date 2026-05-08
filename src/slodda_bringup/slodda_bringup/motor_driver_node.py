@@ -49,10 +49,10 @@ LEFT_DIR_PIN_B  = 24   # B1
 RIGHT_PWM_PIN   = 19   # P2
 RIGHT_DIR_PIN_A = 26   # B2 (swapped to reverse motor 2 polarity)
 RIGHT_DIR_PIN_B = 25   # A2
-LEFT_ENC_A_PIN  = None  # encoder not yet wired
-LEFT_ENC_B_PIN  = None
-RIGHT_ENC_A_PIN = None
-RIGHT_ENC_B_PIN = None
+LEFT_ENC_A_PIN  = 17   # Motor 1 Hall A
+LEFT_ENC_B_PIN  = 27   # Motor 1 Hall B
+RIGHT_ENC_A_PIN = 22   # Motor 2 Hall A
+RIGHT_ENC_B_PIN = 5    # Motor 2 Hall B
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
@@ -141,10 +141,12 @@ class MotorDriverNode(Node):
                 self.gpio.setup_input(pin, pull_up=True)
 
     def _setup_encoder_interrupts(self):
+        # 'both' edges: count rising AND falling on channel A.
+        # TICKS_PER_REV=663 = 11PPR × 2 edges × 30.15 gear ratio — requires both edges.
         if LEFT_ENC_A_PIN is not None:
-            self.gpio.attach_interrupt(LEFT_ENC_A_PIN, 'rising', self._on_left_tick)
+            self.gpio.attach_interrupt(LEFT_ENC_A_PIN, 'both', self._on_left_tick)
         if RIGHT_ENC_A_PIN is not None:
-            self.gpio.attach_interrupt(RIGHT_ENC_A_PIN, 'rising', self._on_right_tick)
+            self.gpio.attach_interrupt(RIGHT_ENC_A_PIN, 'both', self._on_right_tick)
 
     # ── cmd_vel handler — stores targets only, PID loop drives PWM ────────────
 

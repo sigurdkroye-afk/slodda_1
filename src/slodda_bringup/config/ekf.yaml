@@ -1,14 +1,12 @@
 ekf_filter_node:
   ros__parameters:
-    # frequency must be HIGH enough that odom→base_footprint TF updates
-    # faster than the costmap runs (3 Hz local, 1 Hz global).
-    # At 2 Hz (old), the TF was stale for 500 ms between updates → costmap
-    # rasterised 10 Hz lidar scans against the wrong (old) yaw →
-    # "costmap rotates around robot" symptom.
-    frequency: 30.0
-    sensor_timeout: 0.5      # drop sensor after 500 ms silence (was 1.0)
+    # Pi4 CPU budget with Nav2: ~100ms per cycle is sustainable.
+    # 30 Hz (33ms budget) failed every cycle. 10 Hz (100ms budget) succeeds
+    # for typical loads; transform_tolerance 0.3s = 3 EKF cycles of margin.
+    frequency: 10.0
+    sensor_timeout: 0.5
     two_d_mode: true
-    transform_timeout: 0.1   # require fresh TF within 100 ms (was 0.5)
+    transform_timeout: 0.1
     publish_tf: true
     publish_acceleration: false
     print_diagnostics: false
@@ -18,28 +16,29 @@ ekf_filter_node:
     base_link_frame: base_footprint
     world_frame:     odom
 
-    # Wheel odometry DISABLED — encoders not wired, ticks always zero.
-    # Fusing zero velocities would fight IMU yaw correction.
-    # Re-enable when encoders are connected.
+    # Wheel odometry — encoders now wired (GPIO 17/27 left, 22/5 right).
+    # Fuse vx (forward velocity) and vyaw. Not absolute pose — it drifts.
+    odom0: /odom
+    odom0_config: [false, false, false,
+                   false, false, false,
+                   true,  false, false,
+                   false, false, true,
+                   false, false, false]
+    odom0_differential: false
+    odom0_relative: false
+    odom0_queue_size: 5
+    odom0_nodelay: true
 
-    # IMU — fuse BOTH absolute yaw (differential) AND yaw rate.
-    #
-    # imu0_config field order (robot_localization):
-    #   [x, y, z,  roll, pitch, YAW,  vx, vy, vz,  vroll, vpitch, VYAW,  ax, ay, az]
-    #    0  1  2   3     4      5     6   7   8    9      10      11   12  13  14
-    #
-    # index 5  = absolute yaw → with imu0_differential:true becomes delta-yaw
-    # index 11 = angular_velocity.z (yaw rate) direct
-    #
-    # Combined effect: index-11 gives immediate rate; index-5 in differential
-    # mode provides a second correlated yaw estimate that corrects gyro bias drift.
+    # IMU — yaw rate only (angular_velocity.z).
+    # Absolute yaw fusion removed: corrupted I2C quaternions cause EKF spikes.
+    # Gyro rate + wheel vyaw gives stable yaw without magnetometer dependency.
     imu0: /imu/data
     imu0_config: [false, false, false,
-                  false, false, true,    # absolute yaw (used differentially)
                   false, false, false,
-                  false, false, true,    # yaw rate direct
+                  false, false, false,
+                  false, false, true,
                   false, false, false]
-    imu0_differential: true              # treat absolute yaw as delta-yaw
+    imu0_differential: false
     imu0_relative: false
     imu0_remove_gravitational_acceleration: true
     imu0_queue_size: 10
