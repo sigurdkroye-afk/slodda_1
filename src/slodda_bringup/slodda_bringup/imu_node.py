@@ -88,7 +88,8 @@ class ImuNode(Node):
         try:
             i2c = busio.I2C(board.SCL, board.SDA, frequency=50_000)
             self._bno = BNO08X_I2C(
-                i2c, address=self.get_parameter('i2c_address').value)
+                i2c, address=self.get_parameter('i2c_address').value,
+                debug=False)
             time.sleep(1.0)
             for feature in (BNO_REPORT_GAME_ROTATION_VECTOR,
                             BNO_REPORT_GYROSCOPE,
