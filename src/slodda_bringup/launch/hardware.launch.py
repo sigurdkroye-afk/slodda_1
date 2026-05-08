@@ -54,7 +54,7 @@ def generate_launch_description():
         package='slodda_bringup',
         executable='imu_node',
         output='screen',
-        parameters=[hw, {'publish_hz': 5.0, 'frame_id': 'imu_link'}]
+        parameters=[hw, {'publish_hz': 20.0, 'frame_id': 'imu_link'}]
     )
 
     motor_driver = Node(

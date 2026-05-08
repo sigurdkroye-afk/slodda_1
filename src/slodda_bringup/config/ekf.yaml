@@ -1,9 +1,14 @@
 ekf_filter_node:
   ros__parameters:
-    frequency: 2.0
-    sensor_timeout: 1.0
+    # frequency must be HIGH enough that odom→base_footprint TF updates
+    # faster than the costmap runs (3 Hz local, 1 Hz global).
+    # At 2 Hz (old), the TF was stale for 500 ms between updates → costmap
+    # rasterised 10 Hz lidar scans against the wrong (old) yaw →
+    # "costmap rotates around robot" symptom.
+    frequency: 30.0
+    sensor_timeout: 0.5      # drop sensor after 500 ms silence (was 1.0)
     two_d_mode: true
-    transform_timeout: 0.5
+    transform_timeout: 0.1   # require fresh TF within 100 ms (was 0.5)
     publish_tf: true
     publish_acceleration: false
     print_diagnostics: false
@@ -14,25 +19,28 @@ ekf_filter_node:
     world_frame:     odom
 
     # Wheel odometry DISABLED — encoders not wired, ticks always zero.
-    # Fusing zero velocities into EKF fights IMU yaw correction and gives
-    # worse results than IMU-only. Re-enable when encoders are connected.
-    #
-    # odom0: /odom
-    # odom0_config: [false, false, false,
-    #                false, false, false,
-    #                true,  false, false,
-    #                false, false, true,
-    #                false, false, false]
+    # Fusing zero velocities would fight IMU yaw correction.
+    # Re-enable when encoders are connected.
 
-    # IMU — fuse yaw rate only (gives correct rotation tracking without encoders)
+    # IMU — fuse BOTH absolute yaw (differential) AND yaw rate.
+    #
+    # imu0_config field order (robot_localization):
+    #   [x, y, z,  roll, pitch, YAW,  vx, vy, vz,  vroll, vpitch, VYAW,  ax, ay, az]
+    #    0  1  2   3     4      5     6   7   8    9      10      11   12  13  14
+    #
+    # index 5  = absolute yaw → with imu0_differential:true becomes delta-yaw
+    # index 11 = angular_velocity.z (yaw rate) direct
+    #
+    # Combined effect: index-11 gives immediate rate; index-5 in differential
+    # mode provides a second correlated yaw estimate that corrects gyro bias drift.
     imu0: /imu/data
     imu0_config: [false, false, false,
+                  false, false, true,    # absolute yaw (used differentially)
                   false, false, false,
-                  false, false, false,
-                  false, false, true,
+                  false, false, true,    # yaw rate direct
                   false, false, false]
-    imu0_differential: false
+    imu0_differential: true              # treat absolute yaw as delta-yaw
     imu0_relative: false
     imu0_remove_gravitational_acceleration: true
-    imu0_queue_size: 5
+    imu0_queue_size: 10
     imu0_nodelay: true
