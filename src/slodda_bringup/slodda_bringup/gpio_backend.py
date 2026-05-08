@@ -180,6 +180,8 @@ class LgpioBackend(GpioBackend):
         return bool(self._lg.gpio_read(self._h, pin))
 
     def attach_interrupt(self, pin: int, edge: str, callback) -> None:
+        # gpio_claim_input doesn't enable edge alerts — must re-claim as alert
+        self._lg.gpio_claim_alert(self._h, pin, self._EDGE[edge], self._lg.SET_PULL_UP)
         cb = self._lg.callback(self._h, pin, self._EDGE[edge], callback)
         self._callbacks.append(cb)
 

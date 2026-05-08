@@ -7,7 +7,7 @@ LEFT_ENC_A_PIN = 17
 h = lgpio.gpiochip_open(0)
 
 print("=== TEST 1: polling GPIO17 (200 samples, 5ms apart) ===")
-lgpio.gpio_claim_input(h, LEFT_ENC_A_PIN, lgpio.SET_PULL_UP)
+lgpio.gpio_claim_alert(h, LEFT_ENC_A_PIN, lgpio.BOTH_EDGES, lgpio.SET_PULL_UP)
 vals = []
 for _ in range(200):
     vals.append(lgpio.gpio_read(h, LEFT_ENC_A_PIN))
