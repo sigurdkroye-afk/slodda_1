@@ -4,7 +4,7 @@
 
 odometry_node:
   ros__parameters:
-    wheel_radius_m: 0.0100   # calibrated (was 0.0208 — original was diameter, not radius)
+    wheel_radius_m: 0.01034  # calibrated (was 0.0208 — original was diameter, not radius)
     wheel_base_m:   0.256    # TUNE: belt center-to-center separation (m)
     ticks_per_rev:  663.0    # 11PPR × 2 edges × 30.15 gear ratio
     publish_tf:     true     # true when running without EKF (motors_only), false in hardware.launch

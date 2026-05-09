@@ -89,7 +89,7 @@ def generate_launch_description():
         executable='odometry_node',
         output='screen',
         parameters=[hw, {
-            'wheel_radius_m': 0.0100,
+            'wheel_radius_m': 0.01034,
             'wheel_base_m':   0.256,
             'ticks_per_rev':  663.0,
             'publish_tf':     False,  # EKF publishes odom→base_footprint TF
