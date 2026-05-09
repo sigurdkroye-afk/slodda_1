@@ -235,8 +235,8 @@ def generate_launch_description():
             behavior_server,
             bt_navigator,
         ]),
-        # Phase 5: t=30s — lifecycle manager (extra margin after staggered init)
-        TimerAction(period=30.0, actions=[
+        # Phase 5: t=50s — lifecycle manager (extra margin; EKF must be stable first)
+        TimerAction(period=50.0, actions=[
             lifecycle_manager_navigation,
         ]),
         rviz,
