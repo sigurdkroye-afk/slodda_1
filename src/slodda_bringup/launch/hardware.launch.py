@@ -105,13 +105,13 @@ def generate_launch_description():
     )
 
     # ── Phase 3 (t=8s): SLAM Toolbox ─────────────────────────────────────────
-    # scan_throttle relays /scan → /slam_scan at 1 Hz so every scan SLAM sees
-    # has a guaranteed EKF transform available (no MessageFilter queue overflow).
+    # scan_throttle relays /scan → /slam_scan at 0.5 Hz — halves SLAM Ceres
+    # CPU load vs 1 Hz, giving EKF headroom on Pi4.
     scan_throttle = Node(
         package='slodda_bringup',
         executable='scan_throttle',
         output='screen',
-        parameters=[hw, {'rate_hz': 1.0}],
+        parameters=[hw, {'rate_hz': 0.5}],
     )
 
     # async_slam_toolbox_node is a lifecycle node — needs lifecycle manager.
@@ -193,7 +193,7 @@ def generate_launch_description():
                 'bt_navigator',
             ],
             'bond_timeout': 120.0,
-            'bond.heartbeat_period': 5.0,
+            'bond.heartbeat_period': 1.0,
             'bond.heartbeat_timeout': 60.0,
             'attempt_respawn_reconnection': True,
             'bond_respawn_max_duration': 60.0,
@@ -237,7 +237,7 @@ def generate_launch_description():
             behavior_server,
             bt_navigator,
         ]),
-        # Phase 4c: t=30s — scan throttle starts AFTER Nav2 plugins loaded
+        # Phase 4c: t=30s — scan throttle at 0.5Hz: halves SLAM Ceres CPU load
         # Prevents SLAM Ceres solver from starving Nav2 DDS/plugin loading
         TimerAction(period=30.0, actions=[scan_throttle]),
         # Phase 5: t=60s — lifecycle manager

@@ -16,10 +16,4 @@ def generate_launch_description():
         output='screen'
     )
 
-    hardware_panel = Node(
-        package='slodda_bringup',
-        executable='hardware_panel',
-        output='screen'
-    )
-
-    return LaunchDescription([rviz, hardware_panel])
+    return LaunchDescription([rviz])
