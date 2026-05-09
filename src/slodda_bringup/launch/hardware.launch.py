@@ -104,6 +104,15 @@ def generate_launch_description():
     )
 
     # ── Phase 3 (t=8s): SLAM Toolbox ─────────────────────────────────────────
+    # scan_throttle relays /scan → /slam_scan at 1 Hz so every scan SLAM sees
+    # has a guaranteed EKF transform available (no MessageFilter queue overflow).
+    scan_throttle = Node(
+        package='slodda_bringup',
+        executable='scan_throttle',
+        output='screen',
+        parameters=[hw, {'rate_hz': 1.0}],
+    )
+
     # async_slam_toolbox_node is a lifecycle node — needs lifecycle manager.
     # Lifecycle manager starts at t=10s (2s after SLAM) to let it advertise services.
     slam_node = Node(
@@ -212,8 +221,8 @@ def generate_launch_description():
             odometry_node,
             ekf_node,
         ]),
-        # Phase 3: t=8s — SLAM Toolbox, t=10s — lifecycle manager for SLAM
-        TimerAction(period=8.0, actions=[slam_node]),
+        # Phase 3: t=8s — scan throttle + SLAM Toolbox, t=10s — lifecycle manager
+        TimerAction(period=8.0, actions=[scan_throttle, slam_node]),
         TimerAction(period=10.0, actions=[lifecycle_manager_slam]),
         # Phase 4a: t=12s — heavy Nav2 servers (each has costmap inside)
         TimerAction(period=12.0, actions=[

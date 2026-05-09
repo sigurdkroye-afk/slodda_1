@@ -45,6 +45,7 @@ setup(
             'imu_node = slodda_bringup.imu_node:main',
             'camera_node = slodda_bringup.camera_node:main',
             'hardware_panel = slodda_bringup.hardware_panel:main',
+            'scan_throttle = slodda_bringup.scan_throttle:main',
         ],
     },
 )
