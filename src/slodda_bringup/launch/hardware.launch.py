@@ -222,8 +222,9 @@ def generate_launch_description():
             odometry_node,
             ekf_node,
         ]),
-        # Phase 3: t=8s — scan throttle + SLAM Toolbox, t=10s — lifecycle manager
-        TimerAction(period=8.0, actions=[scan_throttle, slam_node]),
+        # Phase 3: t=8s — SLAM Toolbox node only (no scans yet), t=10s — lifecycle manager
+        # scan_throttle delayed to t=30s so SLAM Ceres solver doesn't compete with Nav2 plugin loading
+        TimerAction(period=8.0, actions=[slam_node]),
         TimerAction(period=10.0, actions=[lifecycle_manager_slam]),
         # Phase 4a: t=12s — heavy Nav2 servers (each has costmap inside)
         TimerAction(period=12.0, actions=[
@@ -236,8 +237,11 @@ def generate_launch_description():
             behavior_server,
             bt_navigator,
         ]),
-        # Phase 5: t=50s — lifecycle manager (extra margin; EKF must be stable first)
-        TimerAction(period=50.0, actions=[
+        # Phase 4c: t=30s — scan throttle starts AFTER Nav2 plugins loaded
+        # Prevents SLAM Ceres solver from starving Nav2 DDS/plugin loading
+        TimerAction(period=30.0, actions=[scan_throttle]),
+        # Phase 5: t=60s — lifecycle manager
+        TimerAction(period=60.0, actions=[
             lifecycle_manager_navigation,
         ]),
         rviz,
