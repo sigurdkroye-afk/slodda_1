@@ -2,15 +2,16 @@
 """Wheel odometry calibration tool.
 
 Requires motors_only.launch.py to be running (motor_driver + odometry_node).
-Does NOT need Nav2, SLAM, EKF, or LiDAR.
 
-Usage:
-  Terminal 1: ros2 launch slodda_bringup motors_only.launch.py
-  Terminal 2: ros2 run slodda_bringup odom_calibration \
-                --ros-args -p current_wheel_radius_m:=0.0108
+Usage — avstandsbasert (anbefalt):
+  ros2 run slodda_bringup odom_calibration \
+    --ros-args -p drive_distance_m:=1.0 -p current_wheel_radius_m:=0.0103
 
-IMPORTANT: Pass current_wheel_radius_m = whatever value odometry_node is
-using right now (set via ros2 param set or motors.yaml).
+  Robot kjører til odom sier 1.0m, stopper. Mål fysisk avstand.
+
+Usage — tidsbasert (original):
+  ros2 run slodda_bringup odom_calibration \
+    --ros-args -p current_wheel_radius_m:=0.0103
 """
 import math
 import rclpy
@@ -22,9 +23,10 @@ from nav_msgs.msg import Odometry
 class OdomCalibration(Node):
     def __init__(self):
         super().__init__('odom_calibration')
-        self.declare_parameter('drive_speed_mps',      0.15)
-        self.declare_parameter('drive_duration_s',     7.0)
-        self.declare_parameter('current_wheel_radius_m', 0.0)  # 0 = unknown
+        self.declare_parameter('drive_speed_mps',        0.15)
+        self.declare_parameter('drive_duration_s',       7.0)   # brukes kun i tidsbasert modus
+        self.declare_parameter('drive_distance_m',       0.0)   # >0 → avstandsbasert modus
+        self.declare_parameter('current_wheel_radius_m', 0.0)   # 0 = ukjent
 
         self._cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
         self._odom    = None
@@ -46,18 +48,24 @@ class OdomCalibration(Node):
             pass
 
     def run(self):
-        speed     = self.get_parameter('drive_speed_mps').value
-        duration  = self.get_parameter('drive_duration_s').value
-        current_r = self.get_parameter('current_wheel_radius_m').value
+        speed       = self.get_parameter('drive_speed_mps').value
+        duration    = self.get_parameter('drive_duration_s').value
+        target_dist = self.get_parameter('drive_distance_m').value
+        current_r   = self.get_parameter('current_wheel_radius_m').value
+
+        dist_mode = target_dist > 0
 
         print('\n=== Slodda Wheel Odometry Calibration ===')
-        print(f'Drive plan: {speed} m/s × {duration} s = ~{speed*duration:.2f} m')
+        if dist_mode:
+            print(f'Modus: kjør til odom = {target_dist:.2f} m  (speed={speed} m/s)')
+        else:
+            print(f'Modus: kjør {duration}s ved {speed} m/s = ~{speed*duration:.2f} m')
         if current_r <= 0:
-            print('[NOTE] Pass --ros-args -p current_wheel_radius_m:=<value> for accurate result calc.')
-        print('\nWaiting for /odom ...')
+            print('[NOTE] Pass -p current_wheel_radius_m:=<verdi> for korrekt resultatberegning.')
+        print('\nVenter på /odom ...')
         self._spin_until_odom()
 
-        print('Mark start position on floor. Press ENTER to start drive.')
+        print('Merk startposisjon på gulvet. Trykk ENTER for å starte.')
         input()
 
         rclpy.spin_once(self, timeout_sec=0.05)
@@ -65,17 +73,27 @@ class OdomCalibration(Node):
         y0   = self._odom.pose.pose.position.y
         yaw0 = _quat_to_yaw(self._odom.pose.pose.orientation)
         print(f'Start → x={x0:.4f} y={y0:.4f} yaw={math.degrees(yaw0):.1f}°')
-        print('Driving ...')
+        print('Kjører ...')
 
         cmd = Twist()
         cmd.linear.x = speed
-        t_start = self.get_clock().now()
-        while (self.get_clock().now() - t_start).nanoseconds / 1e9 < duration:
-            self._cmd_pub.publish(cmd)
-            rclpy.spin_once(self, timeout_sec=0.05)
+
+        if dist_mode:
+            while True:
+                self._cmd_pub.publish(cmd)
+                rclpy.spin_once(self, timeout_sec=0.02)
+                x = self._odom.pose.pose.position.x
+                y = self._odom.pose.pose.position.y
+                if math.sqrt((x - x0)**2 + (y - y0)**2) >= target_dist:
+                    break
+        else:
+            t_start = self.get_clock().now()
+            while (self.get_clock().now() - t_start).nanoseconds / 1e9 < duration:
+                self._cmd_pub.publish(cmd)
+                rclpy.spin_once(self, timeout_sec=0.05)
 
         self._stop()
-        print('Stopped. Settling ...')
+        print('Stoppet. Venter ...')
         self._spin_seconds(0.5)
 
         x1   = self._odom.pose.pose.position.x
@@ -83,49 +101,46 @@ class OdomCalibration(Node):
         yaw1 = _quat_to_yaw(self._odom.pose.pose.orientation)
 
         odom_dist  = math.sqrt((x1 - x0)**2 + (y1 - y0)**2)
-        # Forward displacement in robot start frame (removes effect of initial yaw)
         fwd  = (x1 - x0) * math.cos(yaw0) + (y1 - y0) * math.sin(yaw0)
         side = -(x1 - x0) * math.sin(yaw0) + (y1 - y0) * math.cos(yaw0)
         yaw_drift = math.degrees(yaw1 - yaw0)
 
         print(f'\n{"="*50}')
-        print(f'Odom distance (Euclidean) : {odom_dist:.4f} m')
-        print(f'Forward  (robot frame)   : {fwd:.4f} m')
-        print(f'Sideways (robot frame)   : {side:.4f} m  (want ~0)')
-        print(f'Yaw drift                : {yaw_drift:.2f}°  (want ~0)')
+        print(f'Odom avstand       : {odom_dist:.4f} m')
+        print(f'Frem  (robotramme) : {fwd:.4f} m')
+        print(f'Side  (robotramme) : {side:.4f} m  (vil ha ~0)')
+        print(f'Yaw-drift          : {yaw_drift:.2f}°  (vil ha ~0)')
         print(f'{"="*50}')
 
         if abs(side) > 0.03:
-            print(f'[WARN] {abs(side)*100:.1f} cm sideways drift — encoder or track asymmetry')
+            print(f'[WARN] {abs(side)*100:.1f} cm sideveis drift — enkoder/belte asymmetri')
         if abs(yaw_drift) > 3.0:
-            print(f'[WARN] {abs(yaw_drift):.1f}° yaw drift — left/right speed mismatch')
+            print(f'[WARN] {abs(yaw_drift):.1f}° yaw-drift — venstre/høyre ubalanse')
 
-        raw = input('\nMeasure physical distance with tape. Enter (m): ').strip()
-        # Accept "1.2 m" or "1.2"
+        raw = input('\nMål fysisk avstand med målebånd. Skriv inn (m): ').strip()
         raw = raw.replace(' m', '').replace(',', '.')
         if raw:
             try:
                 phys_m = float(raw)
                 factor = phys_m / odom_dist
-                print(f'\n--- Result ---')
-                print(f'Physical : {phys_m:.4f} m')
-                print(f'Odom     : {odom_dist:.4f} m')
-                print(f'Factor   : {factor:.5f}')
+                print(f'\n--- Resultat ---')
+                print(f'Fysisk : {phys_m:.4f} m')
+                print(f'Odom   : {odom_dist:.4f} m')
+                print(f'Faktor : {factor:.5f}')
                 if current_r > 0:
                     new_r = current_r * factor
-                    print(f'\nCurrent wheel_radius_m : {current_r:.5f}')
-                    print(f'New     wheel_radius_m : {new_r:.5f}')
-                    print(f'\nSet in motors.yaml and hardware.launch.py:')
+                    print(f'\nNåværende wheel_radius_m : {current_r:.5f}')
+                    print(f'Ny      wheel_radius_m : {new_r:.5f}')
+                    print(f'\nOppdater motors.yaml og hardware.launch.py:')
                     print(f'  wheel_radius_m: {new_r:.5f}')
                 else:
-                    print(f'\nNew wheel_radius_m = current × {factor:.5f}')
-                    print('(Re-run with --ros-args -p current_wheel_radius_m:=<current> for exact value)')
-                if abs(factor - 1.0) > 0.10:
-                    print(f'[WARNING] Factor {factor:.3f} > 10% off — double-check measurement.')
+                    print(f'\nNy wheel_radius_m = nåværende × {factor:.5f}')
+                if abs(factor - 1.0) > 0.05:
+                    print(f'[WARN] Faktor {factor:.3f} > 5% — dobbeltsjekk måling.')
             except ValueError:
-                print('Invalid input.')
+                print('Ugyldig input.')
 
-        print('\nDone.')
+        print('\nFerdig.')
 
 
 def _quat_to_yaw(q) -> float:

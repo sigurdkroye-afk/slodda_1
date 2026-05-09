@@ -76,6 +76,7 @@ def generate_launch_description():
             'max_pwm':               95.0,
             'velocity_deadband_mps': 0.01,
             'cmd_vel_timeout_sec':   0.5,
+            'left_trim':             0.985,  # TUNE: correct rightward drift
         }]
     )
 
@@ -88,7 +89,7 @@ def generate_launch_description():
         executable='odometry_node',
         output='screen',
         parameters=[hw, {
-            'wheel_radius_m': 0.0208,
+            'wheel_radius_m': 0.0103,
             'wheel_base_m':   0.256,
             'ticks_per_rev':  663.0,
             'publish_tf':     False,  # EKF publishes odom→base_footprint TF

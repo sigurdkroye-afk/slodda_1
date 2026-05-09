@@ -19,7 +19,7 @@ from .gpio_backend import LgpioBackend
 
 # ── Robot geometry ─────────────────────────────────────────────────────────────
 WHEEL_BASE_M          = 0.256   # m  belt center-to-center separation (measured)
-WHEEL_RADIUS_M        = 0.0208  # m  drive sprocket radius (measured)
+WHEEL_RADIUS_M        = 0.0103  # m  drive sprocket radius (calibrated)
 ENCODER_TICKS_PER_REV = 663     # GB37Y3530: 11PPR * 2 edges * 30.15 ratio ≈ 663
 METRES_PER_TICK       = 2.0 * math.pi * WHEEL_RADIUS_M / ENCODER_TICKS_PER_REV
 
@@ -129,6 +129,7 @@ class MotorDriverNode(Node):
         self.declare_parameter('pid_kp',                PID_KP)
         self.declare_parameter('pid_ki',                PID_KI)
         self.declare_parameter('pid_kd',                PID_KD)
+        self.declare_parameter('left_trim',             1.0)  # scale left target; <1.0 slows left
 
     def _setup_pins(self):
         for pin in [LEFT_DIR_PIN_A, LEFT_DIR_PIN_B,
@@ -152,9 +153,10 @@ class MotorDriverNode(Node):
 
     def _cmd_cb(self, msg: Twist):
         self.last_cmd_time = self.get_clock().now()
-        wb = self.get_parameter('wheel_base_m').value
-        self._target_left  = msg.linear.x - msg.angular.z * wb / 2.0
-        self._target_right = msg.linear.x + msg.angular.z * wb / 2.0
+        wb   = self.get_parameter('wheel_base_m').value
+        trim = self.get_parameter('left_trim').value
+        self._target_left  = (msg.linear.x - msg.angular.z * wb / 2.0) * trim
+        self._target_right =  msg.linear.x + msg.angular.z * wb / 2.0
 
     # ── PID control loop ───────────────────────────────────────────────────────
 
