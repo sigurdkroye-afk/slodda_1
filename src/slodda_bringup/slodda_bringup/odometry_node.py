@@ -12,8 +12,8 @@ from tf2_ros import TransformBroadcaster
 #   WHEEL_RADIUS_M → radius of the drive sprocket (where the belt contacts the axle)
 #   WHEEL_BASE_M   → center-to-center distance between left and right belt
 # These defaults are placeholders — override via ROS params or set correct values.
-WHEEL_RADIUS_M = 0.0208  # drive sprocket radius (measured: 20.8 mm)
-WHEEL_BASE_M   = 0.256   # belt center-to-center separation (measured: 25.6 cm)
+WHEEL_RADIUS_M = 0.01021 # drive sprocket radius (calibrated — original 0.0208 was diameter not radius)
+WHEEL_BASE_M   = 0.2316  # effective turning wheel base (calibrated, < physical 0.256 — track slip)
 TICKS_PER_REV  = 663     # GB37Y3530: 11PPR × 2 edges × 30.15 ratio (output shaft)
 
 # Tracks slip more than wheels, especially during in-place turns.  Odometry will

@@ -3,10 +3,10 @@ ekf_filter_node:
     # Pi4 CPU budget with Nav2: 200ms per cycle is needed.
     # 10 Hz (100ms) overruns 0.6-1.2s during Nav2 startup (Pi4 maxed).
     # 5 Hz (200ms budget) leaves enough headroom; transform_tolerance=1.0s covers it.
-    frequency: 2.0
+    frequency: 5.0
     sensor_timeout: 0.5
     two_d_mode: true
-    transform_timeout: 1.0    # at 2Hz (500ms cycle) must cover full cycle + margin
+    transform_timeout: 1.0    # at 5Hz (200ms cycle); 1.0s covers Ceres solver spikes
     publish_tf: true
     publish_acceleration: false
     print_diagnostics: false

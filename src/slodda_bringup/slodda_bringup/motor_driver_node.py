@@ -18,7 +18,7 @@ from std_msgs.msg import Int32MultiArray
 from .gpio_backend import LgpioBackend
 
 # ── Robot geometry ─────────────────────────────────────────────────────────────
-WHEEL_BASE_M          = 0.256   # m  belt center-to-center separation (measured)
+WHEEL_BASE_M          = 0.2316  # m  effective turning wheel base (calibrated, < physical 0.256)
 WHEEL_RADIUS_M        = 0.01021 # m  drive sprocket radius (calibrated)
 ENCODER_TICKS_PER_REV = 663     # GB37Y3530: 11PPR * 2 edges * 30.15 ratio ≈ 663
 METRES_PER_TICK       = 2.0 * math.pi * WHEEL_RADIUS_M / ENCODER_TICKS_PER_REV

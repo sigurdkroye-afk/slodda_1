@@ -11,13 +11,13 @@ odometry_node:
 
 motor_driver:
   ros__parameters:
-    wheel_base_m:          0.256   # keep in sync with odometry_node
+    wheel_base_m:          0.2316   # calibrated effective wheel base (was 0.256 physical)
     max_wheel_speed_mps:   0.5
-    min_pwm:               25.0    # TUNE: minimum PWM to overcome static friction
+    min_pwm:               25.0     # TUNE: minimum PWM to overcome static friction
     max_pwm:               95.0
-    velocity_deadband_mps: 0.01
+    velocity_deadband_mps: 0.005    # reduced from 0.01 for finer angular control
     cmd_vel_timeout_sec:   0.5
-    pid_kp:                30.0    # TUNE: proportional gain
-    pid_ki:                5.0     # TUNE: integral gain
-    pid_kd:                0.5     # TUNE: derivative gain
-    left_trim:             1.0     # 1.0 = no trim; yaw correction handled by EKF+IMU
+    pid_kp:                25.0     # reduced from 30 — smoother response
+    pid_ki:                3.0      # reduced from 5 — less integral windup
+    pid_kd:                0.3      # reduced from 0.5 — less derivative noise
+    left_trim:             1.0      # 1.0 = no trim; yaw correction handled by EKF+IMU
