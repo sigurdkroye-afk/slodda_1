@@ -76,7 +76,7 @@ Visualization Manager:
       Topic:
         Depth: 1
         Durability Policy: Transient Local
-        Filter size: 10
+        Filter size: 1
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /local_costmap/costmap
@@ -89,7 +89,7 @@ Visualization Manager:
       Topic:
         Depth: 1
         Durability Policy: Transient Local
-        Filter size: 10
+        Filter size: 1
         History Policy: Keep Last
         Reliability Policy: Reliable
         Value: /global_costmap/costmap
@@ -130,7 +130,7 @@ Visualization Manager:
         Value: /local_plan
       Value: true
     - Class: rviz_default_plugins/Image
-      Enabled: true
+      Enabled: false
       Max Value: 1.0
       Median window: 5
       Min Value: 0.0
@@ -142,7 +142,7 @@ Visualization Manager:
         History Policy: Keep Last
         Reliability Policy: Best Effort
         Value: /camera/image_raw
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz_default_plugins/PoseWithCovariance
       Enabled: false
