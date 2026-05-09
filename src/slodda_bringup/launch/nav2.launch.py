@@ -13,6 +13,7 @@ def generate_launch_description():
 
     nav2_params = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
     map_file    = os.path.join(pkg_gazebo,  'maps',   'arena_map.yaml')
+    bt_xml      = os.path.join(pkg_bringup, 'behavior_trees', 'navigate_to_pose_no_spin.xml')
 
     sim_time = {'use_sim_time': True}
 
@@ -76,7 +77,7 @@ def generate_launch_description():
         executable='bt_navigator',
         name='bt_navigator',
         output='screen',
-        parameters=[sim_time, nav2_params]
+        parameters=[sim_time, nav2_params, {'default_nav_to_pose_bt_xml': bt_xml}]
     )
 
     # Lifecycle managers must NOT use sim_time — their service_timeout must be
