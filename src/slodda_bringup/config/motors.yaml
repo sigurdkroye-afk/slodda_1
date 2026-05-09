@@ -1,0 +1,22 @@
+# motors.yaml — odometry & motor tuning parameters
+# Referenced by: motors_only.launch.py (calibration/testing)
+# Also update hardware.launch.py manually after calibration.
+
+odometry_node:
+  ros__parameters:
+    wheel_radius_m: 0.0208   # TUNE: drive sprocket radius (m) — calibrate with odom_calibration
+    wheel_base_m:   0.256    # TUNE: belt center-to-center separation (m) — calibrate with rotation test
+    ticks_per_rev:  663.0    # 11PPR × 2 edges × 30.15 gear ratio
+    publish_tf:     true     # true when running without EKF (motors_only), false in hardware.launch
+
+motor_driver:
+  ros__parameters:
+    wheel_base_m:          0.256   # keep in sync with odometry_node
+    max_wheel_speed_mps:   0.5
+    min_pwm:               25.0    # TUNE: minimum PWM to overcome static friction
+    max_pwm:               95.0
+    velocity_deadband_mps: 0.01
+    cmd_vel_timeout_sec:   0.5
+    pid_kp:                30.0    # TUNE: proportional gain
+    pid_ki:                5.0     # TUNE: integral gain
+    pid_kd:                0.5     # TUNE: derivative gain

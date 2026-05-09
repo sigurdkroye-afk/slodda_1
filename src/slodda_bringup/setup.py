@@ -46,6 +46,7 @@ setup(
             'camera_node = slodda_bringup.camera_node:main',
             'hardware_panel = slodda_bringup.hardware_panel:main',
             'scan_throttle = slodda_bringup.scan_throttle:main',
+            'odom_calibration = slodda_bringup.odom_calibration:main',
         ],
     },
 )
