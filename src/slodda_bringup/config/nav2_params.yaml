@@ -17,7 +17,7 @@ controller_server:
     use_sim_time: false
     bond.heartbeat_period: 1.0
     bond.heartbeat_timeout: 60.0
-    controller_frequency: 5.0
+    controller_frequency: 10.0
     enable_stamped_cmd_vel: false
     progress_checker_plugins: ["progress_checker"]
     goal_checker_plugins: ["goal_checker"]
@@ -25,17 +25,24 @@ controller_server:
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
       required_movement_radius: 0.05
-      movement_time_allowance: 20.0
+      movement_time_allowance: 8.0
     goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
       xy_goal_tolerance: 0.20
       yaw_goal_tolerance: 0.35
       stateful: true
     FollowPath:
-      plugin: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      plugin: "nav2_rotation_shim_controller::RotationShimController"
+      primary_controller: "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController"
+      angular_dist_threshold: 0.5
+      forward_sampling_distance: 0.4
+      rotate_to_heading_angular_vel: 0.45
+      max_angular_accel: 1.0
+      simulate_ahead_time: 0.5
+      rotate_to_goal_heading: false
       desired_linear_vel: 0.18
       lookahead_dist: 0.35
-      min_lookahead_dist: 0.25
+      min_lookahead_dist: 0.30
       max_lookahead_dist: 0.55
       use_velocity_scaled_lookahead_dist: true
       min_approach_linear_velocity: 0.06
@@ -51,8 +58,6 @@ controller_server:
       transform_tolerance: 0.3
       use_rotate_to_heading: false
       rotate_to_heading_min_angle: 0.785
-      rotate_to_heading_angular_vel: 0.5
-      max_angular_accel: 0.8
       max_robot_pose_search_dist: 10.0
 
 local_costmap:
@@ -86,17 +91,17 @@ local_costmap:
           raytrace_min_range: 0.0
           marking: true
           clearing: true
-          observation_persistence: 2.0
+          observation_persistence: 0.0
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.30
+        inflation_radius: 0.20
         cost_scaling_factor: 3.0
 
 global_costmap:
   global_costmap:
     ros__parameters:
       use_sim_time: false
-      update_frequency: 1.0
+      update_frequency: 2.0
       publish_frequency: 0.5
       global_frame: map
       robot_base_frame: base_footprint
@@ -126,7 +131,7 @@ global_costmap:
           clearing: true
       inflation_layer:
         plugin: "nav2_costmap_2d::InflationLayer"
-        inflation_radius: 0.22
+        inflation_radius: 0.18
         cost_scaling_factor: 3.0
 
 planner_server:
@@ -138,8 +143,8 @@ planner_server:
     planner_plugins: ["GridBased"]
     GridBased:
       plugin: "nav2_navfn_planner::NavfnPlanner"
-      tolerance: 0.25
-      use_astar: false
+      tolerance: 0.5
+      use_astar: true
       allow_unknown: true
 
 smoother_server:
