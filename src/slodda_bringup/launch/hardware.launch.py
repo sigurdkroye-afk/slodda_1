@@ -12,8 +12,9 @@ def generate_launch_description():
     pkg_bringup     = get_package_share_directory('slodda_bringup')
     pkg_description = get_package_share_directory('slodda_description')
 
-    nav2_params = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
-    ekf_params  = os.path.join(pkg_bringup, 'config', 'ekf.yaml')
+    nav2_params  = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
+    ekf_params   = os.path.join(pkg_bringup, 'config', 'ekf.yaml')
+    slam_params  = os.path.join(pkg_bringup, 'config', 'slam_params.yaml')
     rviz_config = os.path.join(pkg_bringup, 'config', 'hardware.rviz')
     bt_xml      = os.path.join(pkg_bringup, 'behavior_trees', 'navigate_to_pose_no_spin.xml')
 
@@ -102,17 +103,15 @@ def generate_launch_description():
         parameters=[ekf_params, hw]
     )
 
-    # ── Phase 3 (t=6s): Static map→odom TF ───────────────────────────────────
-    # Identity transform: robot starts at map origin.
-    # TODO: replace with slam_toolbox once scan-processing issue is debugged.
-    #   Current issue: slam_toolbox starts but never processes scans.
-    #   Suspected cause: tf2 MessageFilter drops scans — needs clean investigation.
-    map_odom_tf = Node(
-        package='tf2_ros',
-        executable='static_transform_publisher',
-        name='map_to_odom',
+    # ── Phase 3 (t=8s): SLAM Toolbox ─────────────────────────────────────────
+    # Starts 4s after EKF (t=4s) so odom→base_footprint TF is stable.
+    # slam_params.yaml uses transform_timeout=1.0 — correct for 5Hz EKF.
+    slam_node = Node(
+        package='slam_toolbox',
+        executable='async_slam_toolbox_node',
+        name='slam_toolbox',
         output='screen',
-        arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+        parameters=[slam_params, hw],
     )
 
     # ── Phase 4 (t=12s): Nav2 servers ─────────────────────────────────────────
@@ -200,9 +199,9 @@ def generate_launch_description():
             odometry_node,
             ekf_node,
         ]),
-        # Phase 3: t=6s — static map→odom TF
-        TimerAction(period=6.0, actions=[
-            map_odom_tf,
+        # Phase 3: t=8s — SLAM Toolbox (map→odom TF via SLAM)
+        TimerAction(period=8.0, actions=[
+            slam_node,
         ]),
         # Phase 4a: t=12s — heavy Nav2 servers (each has costmap inside)
         TimerAction(period=12.0, actions=[
