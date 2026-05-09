@@ -70,7 +70,7 @@ def generate_launch_description():
         executable='motor_driver',
         output='screen',
         parameters=[hw, {
-            'wheel_base_m':          0.256,
+            'wheel_base_m':          0.238,
             'max_wheel_speed_mps':   0.5,
             'min_pwm':               25.0,
             'max_pwm':               95.0,
@@ -90,7 +90,7 @@ def generate_launch_description():
         output='screen',
         parameters=[hw, {
             'wheel_radius_m': 0.01021,
-            'wheel_base_m':   0.256,
+            'wheel_base_m':   0.238,
             'ticks_per_rev':  663.0,
             'publish_tf':     False,  # EKF publishes odom→base_footprint TF
         }]

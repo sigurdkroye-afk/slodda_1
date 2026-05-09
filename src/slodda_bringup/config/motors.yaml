@@ -5,7 +5,7 @@
 odometry_node:
   ros__parameters:
     wheel_radius_m: 0.01021  # calibrated
-    wheel_base_m:   0.256    # TUNE: belt center-to-center separation (m)
+    wheel_base_m:   0.238    # calibrated (effective turning radius < physical 0.256 — track slip)
     ticks_per_rev:  663.0    # 11PPR × 2 edges × 30.15 gear ratio
     publish_tf:     true     # true when running without EKF (motors_only), false in hardware.launch
 
