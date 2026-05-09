@@ -1,7 +1,8 @@
 <!--
-  Nav2 Kilted BT — Spin recovery re-enabled (bond timeout fixed, Pi4 has headroom with 0.5Hz SLAM).
-  Uses WouldAPlannerRecoveryHelp / WouldAControllerRecoveryHelp (Kilted nodes).
-  Recovery order: ClearCostmaps → Spin 90° → Wait → BackUp
+  Nav2 Kilted recovery BT — fixes:
+  1. Global costmap never cleared (was causing wall-data loss → replanning through wall loop)
+  2. BackUp FIRST (0.25m) to exit inflation zone before replanning — was causing StartOccupied
+  3. use_rotate_to_heading enabled in RPP (safe without SLAM), so rotate_to_heading can execute
 -->
 <root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
@@ -14,7 +15,7 @@
             <ComputePathToPose goal="{goal}" path="{path}" planner_id="{selected_planner}" error_code_id="{compute_path_error_code}" error_msg="{compute_path_error_msg}" server_timeout="5000"/>
             <Sequence>
               <WouldAPlannerRecoveryHelp error_code="{compute_path_error_code}"/>
-              <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
+              <ClearEntireCostmap name="ClearLocalCostmap-PlannerCtx" service_name="local_costmap/clear_entirely_local_costmap"/>
             </Sequence>
           </RecoveryNode>
         </RateController>
@@ -34,13 +35,12 @@
         <ReactiveFallback name="RecoveryFallback">
           <GoalUpdated/>
           <RoundRobin name="RecoveryActions">
+            <BackUp backup_dist="0.25" backup_speed="0.05" error_code_id="{backup_error_code}" error_msg="{backup_error_msg}" server_timeout="10000"/>
             <Sequence name="ClearingActions">
               <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
-              <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
             </Sequence>
             <Spin spin_dist="1.57" error_code_id="{spin_error_code}" error_msg="{spin_error_msg}" server_timeout="10000"/>
             <Wait wait_duration="2.0" error_code_id="{wait_error_code}" error_msg="{wait_error_msg}" server_timeout="5000"/>
-            <BackUp backup_dist="0.15" backup_speed="0.05" error_code_id="{backup_error_code}" error_msg="{backup_error_msg}" server_timeout="5000"/>
           </RoundRobin>
         </ReactiveFallback>
       </Sequence>
