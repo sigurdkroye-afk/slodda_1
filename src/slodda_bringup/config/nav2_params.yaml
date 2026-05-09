@@ -48,11 +48,11 @@ controller_server:
       regulated_linear_scaling_min_radius: 0.4
       regulated_linear_scaling_min_speed: 0.08
       allow_reversing: false
-      transform_tolerance: 1.0
-      use_rotate_to_heading: true
+      transform_tolerance: 0.3
+      use_rotate_to_heading: false
       rotate_to_heading_min_angle: 0.785
-      rotate_to_heading_angular_vel: 0.6
-      max_angular_accel: 1.0
+      rotate_to_heading_angular_vel: 0.5
+      max_angular_accel: 0.8
       max_robot_pose_search_dist: 10.0
 
 local_costmap:
@@ -63,7 +63,7 @@ local_costmap:
       publish_frequency: 2.0
       global_frame: odom
       robot_base_frame: base_footprint
-      transform_tolerance: 1.0
+      transform_tolerance: 0.3
       rolling_window: true
       width: 4
       height: 4
@@ -103,12 +103,11 @@ global_costmap:
       footprint: "[[0.16, 0.16], [0.16, -0.16], [-0.16, -0.16], [-0.16, 0.16]]"
       footprint_padding: 0.02
       resolution: 0.10
-      transform_tolerance: 1.0
-      rolling_window: false
-      width: 20
-      height: 20
-      origin_x: -10.0
-      origin_y: -10.0
+      transform_tolerance: 0.3
+      rolling_window: true
+      width: 10
+      height: 10
+      track_unknown_space: true
       plugins: ["obstacle_layer", "inflation_layer"]
       always_send_full_costmap: true
       obstacle_layer:
@@ -188,7 +187,7 @@ behavior_server:
     local_frame: odom
     global_frame: map
     robot_base_frame: base_footprint
-    transform_tolerance: 1.0
+    transform_tolerance: 0.3
     simulate_ahead_time: 1.0
     max_rotational_vel: 0.6
     min_rotational_vel: 0.15

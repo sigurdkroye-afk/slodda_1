@@ -14,9 +14,8 @@ def generate_launch_description():
 
     nav2_params  = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
     ekf_params   = os.path.join(pkg_bringup, 'config', 'ekf.yaml')
-    slam_params  = os.path.join(pkg_bringup, 'config', 'slam_params.yaml')
-    rviz_config = os.path.join(pkg_bringup, 'config', 'hardware.rviz')
-    bt_xml      = os.path.join(pkg_bringup, 'behavior_trees', 'navigate_to_pose_no_spin.xml')
+    rviz_config  = os.path.join(pkg_bringup, 'config', 'hardware.rviz')
+    bt_xml       = os.path.join(pkg_bringup, 'behavior_trees', 'navigate_to_pose_no_spin.xml')
 
     xacro_file        = os.path.join(pkg_description, 'urdf', 'slodda_real.urdf.xacro')
     robot_description = xacro.process_file(xacro_file).toxml()
@@ -27,7 +26,7 @@ def generate_launch_description():
         'rviz', default_value='false',
         description='Launch RViz (true/false)')
 
-    # ── Phase 1 (t=0): Hardware drivers ───────────────────────────────────────
+    # ── Phase 1 (t=0): Hardware drivers + static TF ───────────────────────────
     robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
@@ -40,6 +39,18 @@ def generate_launch_description():
         executable='joint_state_publisher',
         output='screen',
         parameters=[hw, {'robot_description': robot_description}]
+    )
+
+    # Static identity transform: map → odom.
+    # No SLAM — robot starts at map origin. Rolling costmaps follow via odom TF.
+    # Map and odom are identical; all drift is in odom frame (encoder + IMU gyro).
+    static_map_to_odom = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        name='static_map_to_odom',
+        output='screen',
+        arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+        parameters=[hw],
     )
 
     lidar_node = Node(
@@ -74,16 +85,16 @@ def generate_launch_description():
             'max_wheel_speed_mps':   0.5,
             'min_pwm':               25.0,
             'max_pwm':               95.0,
-            'velocity_deadband_mps': 0.01,
+            'velocity_deadband_mps': 0.005,
             'cmd_vel_timeout_sec':   0.5,
-            'left_trim':             1.0,    # 1.0 = no trim; yaw handled by EKF+IMU
+            'left_trim':             1.0,
         }]
     )
 
     # ── Phase 2 (t=4s): Odometry + EKF ──────────────────────────────────────
-    # Encoder vyaw disabled in EKF — track slip + commanded-direction sign
-    # inference make wheel yaw unreliable on this tracked robot.
-    # EKF fuses encoder vx (forward velocity) + IMU gyro.z (yaw rate) only.
+    # EKF fuses encoder vx (forward velocity) + IMU gyro.z (yaw rate).
+    # Encoder vyaw disabled — tracked robot slip makes it unreliable.
+    # IMU is the sole yaw source. EKF publishes odom→base_footprint TF.
     odometry_node = Node(
         package='slodda_bringup',
         executable='odometry_node',
@@ -104,40 +115,7 @@ def generate_launch_description():
         parameters=[ekf_params, hw]
     )
 
-    # ── Phase 3 (t=8s): SLAM Toolbox ─────────────────────────────────────────
-    # scan_throttle relays /scan → /slam_scan at 0.5 Hz — halves SLAM Ceres
-    # CPU load vs 1 Hz, giving EKF headroom on Pi4.
-    scan_throttle = Node(
-        package='slodda_bringup',
-        executable='scan_throttle',
-        output='screen',
-        parameters=[hw, {'rate_hz': 0.5}],
-    )
-
-    # async_slam_toolbox_node is a lifecycle node — needs lifecycle manager.
-    # Lifecycle manager starts at t=10s (2s after SLAM) to let it advertise services.
-    slam_node = Node(
-        package='slam_toolbox',
-        executable='async_slam_toolbox_node',
-        name='slam_toolbox',
-        output='screen',
-        parameters=[slam_params, hw],
-    )
-
-    lifecycle_manager_slam = Node(
-        package='nav2_lifecycle_manager',
-        executable='lifecycle_manager',
-        name='lifecycle_manager_slam',
-        output='screen',
-        parameters=[{
-            'use_sim_time': False,
-            'autostart': True,
-            'node_names': ['slam_toolbox'],
-            'bond_timeout': 0.0,
-        }]
-    )
-
-    # ── Phase 4 (t=12s): Nav2 servers ─────────────────────────────────────────
+    # ── Phase 3 (t=12s): Nav2 servers ─────────────────────────────────────────
     controller_server = Node(
         package='nav2_controller',
         executable='controller_server',
@@ -176,7 +154,9 @@ def generate_launch_description():
         parameters=[hw, nav2_params, {'default_nav_to_pose_bt_xml': bt_xml}]
     )
 
-    # ── Phase 5 (t=22s): Lifecycle manager ────────────────────────────────────
+    # ── Phase 4 (t=30s): Lifecycle manager ────────────────────────────────────
+    # No SLAM = no Ceres CPU competition during Nav2 plugin loading.
+    # 30s gives Nav2 18s to load plugins before lifecycle manager activates.
     lifecycle_manager_navigation = Node(
         package='nav2_lifecycle_manager',
         executable='lifecycle_manager',
@@ -211,37 +191,30 @@ def generate_launch_description():
 
     return LaunchDescription([
         rviz_arg,
-        # Phase 1: immediate
+        # Phase 1: immediate — hardware + static map→odom
         robot_state_publisher,
         joint_state_publisher,
+        static_map_to_odom,
         lidar_node,
         imu_node,
         motor_driver,
-        # Phase 2: t=4s — odometry + EKF (IMU yaw fusion)
+        # Phase 2: t=4s — odometry + EKF (IMU-only yaw)
         TimerAction(period=4.0, actions=[
             odometry_node,
             ekf_node,
         ]),
-        # Phase 3: t=8s — SLAM Toolbox node only (no scans yet), t=10s — lifecycle manager
-        # scan_throttle delayed to t=30s so SLAM Ceres solver doesn't compete with Nav2 plugin loading
-        TimerAction(period=8.0, actions=[slam_node]),
-        TimerAction(period=10.0, actions=[lifecycle_manager_slam]),
-        # Phase 4a: t=12s — heavy Nav2 servers (each has costmap inside)
+        # Phase 3: t=12s — Nav2 servers (no SLAM competing for CPU)
         TimerAction(period=12.0, actions=[
             controller_server,
             planner_server,
         ]),
-        # Phase 4b: t=18s — lighter servers (no costmap)
         TimerAction(period=18.0, actions=[
             smoother_server,
             behavior_server,
             bt_navigator,
         ]),
-        # Phase 4c: t=30s — scan throttle at 0.5Hz: halves SLAM Ceres CPU load
-        # Prevents SLAM Ceres solver from starving Nav2 DDS/plugin loading
-        TimerAction(period=30.0, actions=[scan_throttle]),
-        # Phase 5: t=60s — lifecycle manager
-        TimerAction(period=60.0, actions=[
+        # Phase 4: t=30s — lifecycle manager
+        TimerAction(period=30.0, actions=[
             lifecycle_manager_navigation,
         ]),
         rviz,

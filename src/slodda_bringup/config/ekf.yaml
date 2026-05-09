@@ -1,12 +1,11 @@
 ekf_filter_node:
   ros__parameters:
-    # Pi4 CPU budget with Nav2: 200ms per cycle is needed.
-    # 10 Hz (100ms) overruns 0.6-1.2s during Nav2 startup (Pi4 maxed).
-    # 5 Hz (200ms budget) leaves enough headroom; transform_tolerance=1.0s covers it.
-    frequency: 5.0
-    sensor_timeout: 0.5
+    # No SLAM competing for CPU — EKF can run at 10 Hz.
+    # transform_timeout 0.5s covers worst-case IMU callback latency on Pi4.
+    frequency: 10.0
+    sensor_timeout: 0.2
     two_d_mode: true
-    transform_timeout: 1.0    # at 5Hz (200ms cycle); 1.0s covers Ceres solver spikes
+    transform_timeout: 0.5
     publish_tf: true
     publish_acceleration: false
     print_diagnostics: false
@@ -14,14 +13,12 @@ ekf_filter_node:
     map_frame:       map
     odom_frame:      odom
     base_link_frame: base_footprint
-    world_frame:     odom
+    world_frame:     odom        # EKF publishes odom→base_footprint only
 
-    # Wheel odometry — fuse FORWARD VELOCITY ONLY (vx).
-    # Encoder vyaw DISABLED: tracks slip laterally during pivot, and
-    # motor_driver infers tick sign from commanded PWM direction (not actual
-    # movement), so manual rotation produces zero/wrong-sign vyaw and
-    # drags EKF yaw to zero, fighting the IMU gyro.
-    # IMU is the sole yaw source — more accurate for tracked robots.
+    # Wheel odometry — vx only (forward velocity from encoder ticks).
+    # vyaw DISABLED: tracked robot slips laterally during pivots, and motor_driver
+    # infers tick sign from commanded PWM direction (not actual movement),
+    # so manual rotation produces zero/wrong-sign vyaw.
     odom0: /odom
     odom0_config: [false, false, false,
                    false, false, false,
@@ -33,9 +30,9 @@ ekf_filter_node:
     odom0_queue_size: 5
     odom0_nodelay: true
 
-    # IMU — yaw rate only (angular_velocity.z).
-    # Absolute yaw fusion removed: corrupted I2C quaternions cause EKF spikes.
-    # Gyro rate + wheel vyaw gives stable yaw without magnetometer dependency.
+    # IMU — yaw RATE only (angular_velocity.z from BNO085 gyro).
+    # Absolute yaw (quaternion) DISABLED: corrupted I2C packets cause yaw spikes.
+    # Gyro rate is reliable; EKF integrates it for heading estimation.
     imu0: /imu/data
     imu0_config: [false, false, false,
                   false, false, false,
