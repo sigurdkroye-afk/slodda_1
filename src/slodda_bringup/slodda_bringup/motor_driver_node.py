@@ -270,12 +270,35 @@ class MotorDriverNode(Node):
 
 
 def main(args=None):
+    import signal
     rclpy.init(args=args)
     node = MotorDriverNode()
+
+    def _emergency_stop(signum, frame):
+        # Called on SIGTERM/SIGINT — guarantee motors stop before process exits
+        try:
+            node._left_pwm.set_duty(0.0)
+            node._right_pwm.set_duty(0.0)
+            node._left_pwm.stop()
+            node._right_pwm.stop()
+            node.gpio.cleanup()
+        except Exception:
+            pass
+        rclpy.shutdown()
+
+    signal.signal(signal.SIGTERM, _emergency_stop)
+    signal.signal(signal.SIGINT,  _emergency_stop)
+
     try:
         rclpy.spin(node)
-    except KeyboardInterrupt:
+    except Exception:
         pass
     finally:
-        node.destroy_node()
-        rclpy.shutdown()
+        try:
+            node.destroy_node()
+        except Exception:
+            pass
+        try:
+            rclpy.shutdown()
+        except Exception:
+            pass

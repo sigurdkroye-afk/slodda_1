@@ -146,6 +146,8 @@ class LgpioPwmHandle(PwmHandle):
     def stop(self) -> None:
         import lgpio
         lgpio.tx_pwm(self._h, self._pin, 0, 0)
+        # Explicitly drive pin LOW so motor gets no power if process dies mid-cycle
+        lgpio.gpio_claim_output(self._h, self._pin, 0)
 
 
 class LgpioBackend(GpioBackend):
