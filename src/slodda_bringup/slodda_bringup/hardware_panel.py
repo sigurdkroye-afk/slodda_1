@@ -112,6 +112,7 @@ class HardwarePanel(QWidget):
 
 
 def main(args=None):
+    import signal
     rclpy.init(args=args)
     app = QApplication(sys.argv)
     sig = _Signals()
@@ -127,6 +128,13 @@ def main(args=None):
             rclpy.spin_once(node, timeout_sec=0)
     ros_timer.timeout.connect(_spin)
     ros_timer.start(50)
+
+    # Allow Ctrl+C to terminate the Qt app cleanly
+    signal.signal(signal.SIGINT, lambda *_: app.quit())
+    # Qt blocks Python signals — wake up the event loop periodically so SIGINT lands
+    sigint_timer = QTimer()
+    sigint_timer.start(200)
+    sigint_timer.timeout.connect(lambda: None)
 
     exit_code = app.exec_()
     node.destroy_node()

@@ -192,11 +192,11 @@ def generate_launch_description():
                 'behavior_server',
                 'bt_navigator',
             ],
-            'bond_timeout': 60.0,
-            'bond.heartbeat_period': 2.0,
-            'bond.heartbeat_timeout': 30.0,
+            'bond_timeout': 120.0,
+            'bond.heartbeat_period': 5.0,
+            'bond.heartbeat_timeout': 60.0,
             'attempt_respawn_reconnection': True,
-            'bond_respawn_max_duration': 30.0,
+            'bond_respawn_max_duration': 60.0,
         }]
     )
 
