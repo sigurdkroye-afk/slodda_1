@@ -104,14 +104,27 @@ def generate_launch_description():
     )
 
     # ── Phase 3 (t=8s): SLAM Toolbox ─────────────────────────────────────────
-    # Starts 4s after EKF (t=4s) so odom→base_footprint TF is stable.
-    # slam_params.yaml uses transform_timeout=1.0 — correct for 5Hz EKF.
+    # async_slam_toolbox_node is a lifecycle node — needs lifecycle manager.
+    # Lifecycle manager starts at t=10s (2s after SLAM) to let it advertise services.
     slam_node = Node(
         package='slam_toolbox',
         executable='async_slam_toolbox_node',
         name='slam_toolbox',
         output='screen',
         parameters=[slam_params, hw],
+    )
+
+    lifecycle_manager_slam = Node(
+        package='nav2_lifecycle_manager',
+        executable='lifecycle_manager',
+        name='lifecycle_manager_slam',
+        output='screen',
+        parameters=[{
+            'use_sim_time': False,
+            'autostart': True,
+            'node_names': ['slam_toolbox'],
+            'bond_timeout': 0.0,
+        }]
     )
 
     # ── Phase 4 (t=12s): Nav2 servers ─────────────────────────────────────────
@@ -199,10 +212,9 @@ def generate_launch_description():
             odometry_node,
             ekf_node,
         ]),
-        # Phase 3: t=8s — SLAM Toolbox (map→odom TF via SLAM)
-        TimerAction(period=8.0, actions=[
-            slam_node,
-        ]),
+        # Phase 3: t=8s — SLAM Toolbox, t=10s — lifecycle manager for SLAM
+        TimerAction(period=8.0, actions=[slam_node]),
+        TimerAction(period=10.0, actions=[lifecycle_manager_slam]),
         # Phase 4a: t=12s — heavy Nav2 servers (each has costmap inside)
         TimerAction(period=12.0, actions=[
             controller_server,
