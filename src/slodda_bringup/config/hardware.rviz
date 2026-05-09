@@ -75,10 +75,10 @@ Visualization Manager:
       Name: Local Costmap
       Topic:
         Depth: 1
-        Durability Policy: Transient Local
+        Durability Policy: Volatile
         Filter size: 1
         History Policy: Keep Last
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /local_costmap/costmap
       Value: true
     - Alpha: 0.3
@@ -88,10 +88,10 @@ Visualization Manager:
       Name: Global Costmap
       Topic:
         Depth: 1
-        Durability Policy: Transient Local
+        Durability Policy: Volatile
         Filter size: 1
         History Policy: Keep Last
-        Reliability Policy: Reliable
+        Reliability Policy: Best Effort
         Value: /global_costmap/costmap
       Value: true
     - Alpha: 1
