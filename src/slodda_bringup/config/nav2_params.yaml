@@ -180,21 +180,6 @@ behavior_server:
     min_rotational_vel: 0.15
     rotational_acc_lim: 1.0
 
-velocity_smoother:
-  ros__parameters:
-    use_sim_time: false
-    smoothing_frequency: 20.0
-    scale_velocities: false
-    feedback: "OPEN_LOOP"
-    max_velocity: [0.30, 0.0, 0.8]
-    min_velocity: [-0.30, 0.0, -0.8]
-    max_accel: [0.4, 0.0, 1.0]
-    max_decel: [-0.6, 0.0, -1.5]
-    odom_topic: "odom"
-    odom_duration: 0.1
-    deadband_velocity: [0.01, 0.0, 0.05]
-    velocity_timeout: 1.0
-
 waypoint_follower:
   ros__parameters:
     use_sim_time: false
