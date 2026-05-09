@@ -1,11 +1,11 @@
 ekf_filter_node:
   ros__parameters:
-    # No SLAM competing for CPU — EKF can run at 10 Hz.
-    # transform_timeout 0.5s covers worst-case IMU callback latency on Pi4.
-    frequency: 10.0
-    sensor_timeout: 0.2
+    # 15 Hz: tett match til 20 Hz IMU (1.33 samples/cycle), lav dt-aliasing.
+    # Rask nok til at controller (5 Hz) alltid får TF innen transform_tolerance.
+    frequency: 15.0
+    sensor_timeout: 0.1
     two_d_mode: true
-    transform_timeout: 0.5
+    transform_timeout: 0.3
     publish_tf: true
     publish_acceleration: false
     print_diagnostics: false
@@ -13,12 +13,9 @@ ekf_filter_node:
     map_frame:       map
     odom_frame:      odom
     base_link_frame: base_footprint
-    world_frame:     odom        # EKF publishes odom→base_footprint only
+    world_frame:     odom
 
-    # Wheel odometry — vx only (forward velocity from encoder ticks).
-    # vyaw DISABLED: tracked robot slips laterally during pivots, and motor_driver
-    # infers tick sign from commanded PWM direction (not actual movement),
-    # so manual rotation produces zero/wrong-sign vyaw.
+    # Wheel odometry — vx only.
     odom0: /odom
     odom0_config: [false, false, false,
                    false, false, false,
@@ -30,9 +27,11 @@ ekf_filter_node:
     odom0_queue_size: 5
     odom0_nodelay: true
 
-    # IMU — yaw RATE only (angular_velocity.z from BNO085 gyro).
-    # Absolute yaw (quaternion) DISABLED: corrupted I2C packets cause yaw spikes.
-    # Gyro rate is reliable; EKF integrates it for heading estimation.
+    # IMU — yaw RATE only (gyro.z).
+    # imu0_queue_size: 2 (ned fra 10) — forhindrer at akkumulerte samples
+    # integreres samlet etter I2C-dropout (gir yaw-sprang).
+    # imu0_twist_rejection_threshold: outlier-avvisning via Mahalanobis-test
+    # som fanger korrupte BNO085-pakker (error 123/255/0x7b).
     imu0: /imu/data
     imu0_config: [false, false, false,
                   false, false, false,
@@ -42,5 +41,27 @@ ekf_filter_node:
     imu0_differential: false
     imu0_relative: false
     imu0_remove_gravitational_acceleration: true
-    imu0_queue_size: 10
+    imu0_queue_size: 2
     imu0_nodelay: true
+    imu0_twist_rejection_threshold: 0.8
+
+    # Process noise — 15x15 diagonalmatrise.
+    # Lave verdier for yaw (indeks 5,5 = 0.015) og vyaw (11,11 = 0.005)
+    # demper IMU-spikes uten å hindre normal rotasjon. BNO085 gyro-stddev
+    # ~9e-3 rad/s tilsvarer ~1.6e-4 rad² per 15Hz-cycle — svakt nok til at
+    # prosessstøy dominerer over sensor-støy og dampningseffekten er reel.
+    process_noise_covariance: [0.05, 0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,   0.0,  0.0,  0.0,  0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.05, 0.0,  0.0,  0.0,  0.0,   0.0,   0.0,   0.0,  0.0,  0.0,  0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.06, 0.0,  0.0,  0.0,   0.0,   0.0,   0.0,  0.0,  0.0,  0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.03, 0.0,  0.0,   0.0,   0.0,   0.0,  0.0,  0.0,  0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.03, 0.0,   0.0,   0.0,   0.0,  0.0,  0.0,  0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.015, 0.0,   0.0,   0.0,  0.0,  0.0,  0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.025, 0.0,   0.0,  0.0,  0.0,  0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.025, 0.0,  0.0,  0.0,  0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,   0.04, 0.0,  0.0,  0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,   0.0,  0.01, 0.0,  0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,   0.0,  0.0,  0.01, 0.0,   0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,   0.0,  0.0,  0.0,  0.005, 0.0,  0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,   0.0,  0.0,  0.0,  0.0,   0.01, 0.0,  0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,   0.0,  0.0,  0.0,  0.0,   0.0,  0.01, 0.0,
+                               0.0,  0.0,  0.0,  0.0,  0.0,  0.0,   0.0,   0.0,   0.0,  0.0,  0.0,  0.0,   0.0,  0.0,  0.015]

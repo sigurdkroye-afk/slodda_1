@@ -116,12 +116,14 @@ def generate_launch_description():
     )
 
     # ── Phase 3 (t=12s): Nav2 servers ─────────────────────────────────────────
+    # cmd_vel pipeline: controller_server → /cmd_vel_nav → velocity_smoother → /cmd_vel → motor_driver
+    # Velocity smoother filters out RPP oscillation spikes before they reach motors.
     controller_server = Node(
         package='nav2_controller',
         executable='controller_server',
         output='screen',
         parameters=[hw, nav2_params],
-        remappings=[('cmd_vel', 'cmd_vel')]
+        remappings=[('cmd_vel', 'cmd_vel_nav')]
     )
 
     planner_server = Node(
@@ -142,7 +144,20 @@ def generate_launch_description():
         package='nav2_behaviors',
         executable='behavior_server',
         output='screen',
-        parameters=[hw, nav2_params]
+        parameters=[hw, nav2_params],
+        remappings=[('cmd_vel', 'cmd_vel_nav')]
+    )
+
+    velocity_smoother = Node(
+        package='nav2_velocity_smoother',
+        executable='velocity_smoother',
+        name='velocity_smoother',
+        output='screen',
+        parameters=[hw, nav2_params],
+        remappings=[
+            ('cmd_vel',          'cmd_vel_nav'),  # input from controller/behaviors
+            ('cmd_vel_smoothed', 'cmd_vel'),      # output to motor_driver
+        ]
     )
 
     # bt_xml passed explicitly — $(find-pkg-share) in YAML is a launch substitution
@@ -170,6 +185,7 @@ def generate_launch_description():
                 'planner_server',
                 'smoother_server',
                 'behavior_server',
+                'velocity_smoother',
                 'bt_navigator',
             ],
             'bond_timeout': 120.0,
@@ -207,6 +223,7 @@ def generate_launch_description():
         TimerAction(period=12.0, actions=[
             controller_server,
             planner_server,
+            velocity_smoother,
         ]),
         TimerAction(period=18.0, actions=[
             smoother_server,

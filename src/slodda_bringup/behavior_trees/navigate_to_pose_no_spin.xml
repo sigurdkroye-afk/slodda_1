@@ -1,8 +1,7 @@
 <!--
-  Nav2 Kilted recovery BT — fixes:
-  1. Global costmap never cleared (was causing wall-data loss → replanning through wall loop)
-  2. BackUp FIRST (0.25m) to exit inflation zone before replanning — was causing StartOccupied
-  3. use_rotate_to_heading enabled in RPP (safe without SLAM), so rotate_to_heading can execute
+  Nav2 Kilted BT — stabil versjon for tracked robot med noisy IMU.
+  Spin-recovery fjernet: med BNO085 I2C-feil er Spin-yaw upålitelig.
+  Recovery: BackUp 0.25m → ClearLocalCostmap → Wait
 -->
 <root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
@@ -39,7 +38,6 @@
             <Sequence name="ClearingActions">
               <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
             </Sequence>
-            <Spin spin_dist="1.57" error_code_id="{spin_error_code}" error_msg="{spin_error_msg}" server_timeout="10000"/>
             <Wait wait_duration="2.0" error_code_id="{wait_error_code}" error_msg="{wait_error_msg}" server_timeout="5000"/>
           </RoundRobin>
         </ReactiveFallback>
