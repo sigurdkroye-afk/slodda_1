@@ -42,9 +42,11 @@ _ORI_VAR   = 4e-6    # rad²
 _GYRO_VAR  = 8.1e-5  # rad²/s²
 _ACCEL_VAR = 4.4e-4  # m²/s⁴
 
-_REINIT_AFTER_ERRORS = 5    # consecutive read failures before re-init
-_REINIT_COOLDOWN_S   = 5.0  # seconds to wait between re-init attempts
-_READ_HZ             = 20   # background read rate; publish_hz ≤ this
+_REINIT_AFTER_ERRORS    = 5    # consecutive read failures before re-init
+_REINIT_COOLDOWN_S      = 5.0  # seconds to wait between re-init attempts
+_READ_HZ                = 20   # background read rate; publish_hz ≤ this
+_STALE_DATA_TIMEOUT_S   = 0.20 # skip publish if sample older than this
+_POST_REINIT_VALIDATE_S = 0.5  # skip publish for this long after reinit
 
 
 def _diag9(v: float):
@@ -64,6 +66,8 @@ class ImuNode(Node):
 
         # Latest reading tuple (qi,qj,qk,qr, gx,gy,gz, ax,ay,az) or None
         self._data: tuple | None = None
+        self._data_t             = 0.0   # wall-clock time of last good read
+        self._reinit_completed_t = 0.0   # wall-clock time of last reinit OK
         self._lock = threading.Lock()
         self._bno  = None
         self._consecutive_errors = 0
@@ -104,7 +108,8 @@ class ImuNode(Node):
                             raise
                         time.sleep(0.5)
             self._consecutive_errors = 0
-            self._last_reinit_t = time.time()
+            self._last_reinit_t      = time.time()
+            self._reinit_completed_t = time.time()
             self.get_logger().info('BNO085 (re)initialized OK.')
             return True
         except Exception as e:
@@ -131,7 +136,8 @@ class ImuNode(Node):
                 gx, gy, gz      = self._bno.gyro
                 ax, ay, az      = self._bno.linear_acceleration
                 with self._lock:
-                    self._data = (qi, qj, qk, qr, gx, gy, gz, ax, ay, az)
+                    self._data   = (qi, qj, qk, qr, gx, gy, gz, ax, ay, az)
+                    self._data_t = time.time()
                 self._consecutive_errors = 0
             except Exception as e:
                 self._consecutive_errors += 1
@@ -148,10 +154,16 @@ class ImuNode(Node):
     # ── ROS publish callback ─────────────────────────────────────────────────
 
     def _publish(self):
+        now = time.time()
         with self._lock:
-            data = self._data
+            data   = self._data
+            data_t = self._data_t
         if data is None:
             return
+        if now - data_t > _STALE_DATA_TIMEOUT_S:
+            return  # sensor failing/reiniting — don't feed stale gyro to EKF
+        if now - self._reinit_completed_t < _POST_REINIT_VALIDATE_S:
+            return  # BNO085 emits garbage briefly after reinit
 
         qi, qj, qk, qr, gx, gy, gz, ax, ay, az = data
 
