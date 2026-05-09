@@ -25,7 +25,7 @@ METRES_PER_TICK       = 2.0 * math.pi * WHEEL_RADIUS_M / ENCODER_TICKS_PER_REV
 
 # ── PWM ────────────────────────────────────────────────────────────────────────
 PWM_FREQUENCY_HZ      = 1000    # Hz
-MIN_PWM               = 25.0    # %  — overcomes static friction; tune on hardware
+MIN_PWM               = 18.0    # %  — overcomes static friction; tune on hardware
 MAX_PWM               = 95.0    # %
 MAX_WHEEL_SPEED_MPS   = 0.5     # m/s at 100% duty (full-scale reference)
 VELOCITY_DEADBAND_MPS = 0.01    # m/s — below this → PWM=0
@@ -94,6 +94,8 @@ class MotorDriverNode(Node):
         self.left_ticks  = 0
         self.right_ticks = 0
         self._tick_lock  = threading.Lock()
+        self._running    = threading.Event()
+        self._running.set()
 
         self._target_left  = 0.0  # m/s target set by cmd_vel
         self._target_right = 0.0
@@ -231,11 +233,15 @@ class MotorDriverNode(Node):
     # ── Encoder interrupts ─────────────────────────────────────────────────────
 
     def _on_left_tick(self, *_):
+        if not self._running.is_set():
+            return
         sign = 1 if self._left_dir else -1
         with self._tick_lock:
             self.left_ticks += sign
 
     def _on_right_tick(self, *_):
+        if not self._running.is_set():
+            return
         sign = 1 if self._right_dir else -1
         with self._tick_lock:
             self.right_ticks += sign
@@ -276,15 +282,13 @@ def main(args=None):
 
     def _emergency_stop(signum, frame):
         # Called on SIGTERM/SIGINT — guarantee motors stop before process exits
+        node._running.clear()          # stop encoder callbacks first
         try:
             node._left_pwm.set_duty(0.0)
             node._right_pwm.set_duty(0.0)
-            node._left_pwm.stop()
-            node._right_pwm.stop()
-            node.gpio.cleanup()
         except Exception:
             pass
-        rclpy.shutdown()
+        rclpy.shutdown()               # finally-block handles full cleanup
 
     signal.signal(signal.SIGTERM, _emergency_stop)
     signal.signal(signal.SIGINT,  _emergency_stop)

@@ -189,6 +189,14 @@ class LgpioBackend(GpioBackend):
 
     def cleanup(self) -> None:
         for cb in self._callbacks:
-            cb.cancel()
+            try:
+                cb.cancel()
+            except Exception:
+                pass
         self._callbacks.clear()
-        self._lg.gpiochip_close(self._h)
+        import time
+        time.sleep(0.05)  # drain in-flight C callbacks before closing chip
+        try:
+            self._lg.gpiochip_close(self._h)
+        except Exception:
+            pass
