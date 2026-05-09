@@ -178,9 +178,9 @@ class ImuNode(Node):
         msg.orientation.w = qr
         msg.orientation_covariance = _diag9(_ORI_VAR)
 
-        msg.angular_velocity.x = gx
-        msg.angular_velocity.y = gy
-        msg.angular_velocity.z = gz
+        msg.angular_velocity.x = -gx
+        msg.angular_velocity.y = -gy
+        msg.angular_velocity.z = -gz
         msg.angular_velocity_covariance = _diag9(_GYRO_VAR)
 
         msg.linear_acceleration.x = ax
