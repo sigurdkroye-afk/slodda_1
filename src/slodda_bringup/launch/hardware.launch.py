@@ -12,7 +12,7 @@ def generate_launch_description():
     pkg_bringup     = get_package_share_directory('slodda_bringup')
     pkg_description = get_package_share_directory('slodda_description')
 
-    nav2_params  = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
+    nav2_params  = os.path.join(pkg_bringup, 'config', 'nav2_params_hw.yaml')
     ekf_params   = os.path.join(pkg_bringup, 'config', 'ekf.yaml')
     rviz_config  = os.path.join(pkg_bringup, 'config', 'hardware.rviz')
     bt_xml       = os.path.join(pkg_bringup, 'behavior_trees', 'navigate_to_pose_no_spin.xml')
