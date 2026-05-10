@@ -1,31 +1,19 @@
 #!/usr/bin/env python3
 """
-BNO085 IMU node — publishes sensor_msgs/Imu on /imu/data.
+BNO055 IMU node — publishes sensor_msgs/Imu on /imu/data.
 
-Requires adafruit_bno08x and adafruit_blinka on the Raspberry Pi:
-  pip install adafruit-circuitpython-bno08x adafruit-blinka
+Requires Adafruit_BNO055 on the Raspberry Pi:
+  pip install Adafruit_BNO055
 
-Default I2C address: 0x4A (alt: 0x4B if ADR pin is high).
-
-Requires hardware I2C enabled in /boot/firmware/config.txt:
+Uses hardware I2C bus 1 (GPIO 2/3). Requires in /boot/firmware/config.txt:
   dtparam=i2c_arm=on,i2c_arm_baudrate=400000
-Hardware I2C (BCM2711 BSC) handles BNO085 SHTP clock-stretching correctly.
-Software I2C (i2c-gpio) cannot — it permanently blocks the bus under CPU load.
 """
-import time
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
 
 try:
-    import board
-    import busio
-    from adafruit_bno08x import (
-        BNO_REPORT_GAME_ROTATION_VECTOR,
-        BNO_REPORT_GYROSCOPE,
-        BNO_REPORT_LINEAR_ACCELERATION,
-    )
-    from adafruit_bno08x.i2c import BNO08X_I2C
+    from Adafruit_BNO055 import BNO055
     _HW_AVAILABLE = True
 except ImportError:
     _HW_AVAILABLE = False
@@ -46,32 +34,22 @@ class ImuNode(Node):
         super().__init__('imu_node')
         self.declare_parameter('publish_hz',  50.0)
         self.declare_parameter('frame_id',    'imu_link')
-        self.declare_parameter('i2c_address', 0x4A)
+        self.declare_parameter('i2c_address', 0x28)
 
         self._pub = self.create_publisher(Imu, '/imu/data', 10)
         self._bno = None
 
         if not _HW_AVAILABLE:
             self.get_logger().error(
-                'adafruit_bno08x not installed — '
-                'pip install adafruit-circuitpython-bno08x adafruit-blinka')
+                'Adafruit_BNO055 not installed — pip install Adafruit_BNO055')
         else:
-            try:
-                i2c = busio.I2C(board.SCL, board.SDA, frequency=400_000)
-                self._bno = BNO08X_I2C(
-                    i2c, address=self.get_parameter('i2c_address').value)
-                time.sleep(0.5)
-                for feature in (BNO_REPORT_GAME_ROTATION_VECTOR,
-                                BNO_REPORT_GYROSCOPE,
-                                BNO_REPORT_LINEAR_ACCELERATION):
-                    try:
-                        self._bno.enable_feature(feature)
-                    except Exception:
-                        time.sleep(0.2)
-                        self._bno.enable_feature(feature)
-            except Exception as e:
+            addr = self.get_parameter('i2c_address').value
+            self._bno = BNO055.BNO055(rst=None, busnum=1, address=addr)
+            if not self._bno.begin():
+                self.get_logger().error('BNO055 init failed — sjekk kobling og adresse')
                 self._bno = None
-                self.get_logger().error(f'BNO085 init failed: {e}')
+            else:
+                self.get_logger().info('BNO055 initialisert OK.')
 
         hz = self.get_parameter('publish_hz').value
         self.create_timer(1.0 / hz, self._tick)
@@ -80,39 +58,42 @@ class ImuNode(Node):
     def _tick(self):
         if self._bno is None:
             return
+        try:
+            q = self._bno.read_quaternion()  # (w, x, y, z)
+            if q is None or None in q:
+                return
 
-        q = self._bno.game_quaternion
-        if q is None:
-            return
-        qi, qj, qk, qr = q
+            g = self._bno.read_gyroscope()            # (x, y, z) rad/s
+            a = self._bno.read_linear_acceleration()  # (x, y, z) m/s²
 
-        g = self._bno.gyro
-        gx, gy, gz = g if g is not None else (0.0, 0.0, 0.0)
+            w, qx, qy, qz = q
+            gx, gy, gz = g if g is not None else (0.0, 0.0, 0.0)
+            ax, ay, az = a if a is not None else (0.0, 0.0, 0.0)
 
-        a = self._bno.linear_acceleration
-        ax, ay, az = a if a is not None else (0.0, 0.0, 0.0)
+            msg = Imu()
+            msg.header.stamp    = self.get_clock().now().to_msg()
+            msg.header.frame_id = self.get_parameter('frame_id').value
 
-        msg = Imu()
-        msg.header.stamp    = self.get_clock().now().to_msg()
-        msg.header.frame_id = self.get_parameter('frame_id').value
+            msg.orientation.x = qx
+            msg.orientation.y = qy
+            msg.orientation.z = qz
+            msg.orientation.w = w
+            msg.orientation_covariance = _diag9(_ORI_VAR)
 
-        msg.orientation.x = qi
-        msg.orientation.y = qj
-        msg.orientation.z = qk
-        msg.orientation.w = qr
-        msg.orientation_covariance = _diag9(_ORI_VAR)
+            msg.angular_velocity.x = gx
+            msg.angular_velocity.y = gy
+            msg.angular_velocity.z = gz
+            msg.angular_velocity_covariance = _diag9(_GYRO_VAR)
 
-        msg.angular_velocity.x = gx
-        msg.angular_velocity.y = gy
-        msg.angular_velocity.z = gz
-        msg.angular_velocity_covariance = _diag9(_GYRO_VAR)
+            msg.linear_acceleration.x = ax
+            msg.linear_acceleration.y = ay
+            msg.linear_acceleration.z = az
+            msg.linear_acceleration_covariance = _diag9(_ACCEL_VAR)
 
-        msg.linear_acceleration.x = ax
-        msg.linear_acceleration.y = ay
-        msg.linear_acceleration.z = az
-        msg.linear_acceleration_covariance = _diag9(_ACCEL_VAR)
-
-        self._pub.publish(msg)
+            self._pub.publish(msg)
+        except Exception as e:
+            self.get_logger().warn(
+                f'BNO055 lesefeil: {e}', throttle_duration_sec=5.0)
 
 
 def main(args=None):
