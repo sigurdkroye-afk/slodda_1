@@ -47,6 +47,7 @@ setup(
             'hardware_panel = slodda_bringup.hardware_panel:main',
             'scan_throttle = slodda_bringup.scan_throttle:main',
             'odom_calibration = slodda_bringup.odom_calibration:main',
+            'arm_controller_node = slodda_bringup.arm_controller_node:main',
         ],
     },
 )

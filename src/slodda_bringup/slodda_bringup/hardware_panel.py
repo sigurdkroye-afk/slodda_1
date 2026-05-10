@@ -7,6 +7,7 @@ from std_msgs.msg import Bool, Empty
 from geometry_msgs.msg import Twist
 from action_msgs.srv import CancelGoal
 from nav2_msgs.srv import ClearEntireCostmap
+from std_srvs.srv import Trigger
 from cv_bridge import CvBridge
 
 from PyQt5.QtWidgets import (
@@ -36,6 +37,7 @@ class _Node(Node):
             ClearEntireCostmap, '/local_costmap/clear_entirely_local_costmap')
         self._clear_global = self.create_client(
             ClearEntireCostmap, '/global_costmap/clear_entirely_global_costmap')
+        self._arm_stop_svc = self.create_client(Trigger, '/arm/stop')
 
     def _img_cb(self, msg):
         try:
@@ -52,6 +54,10 @@ class _Node(Node):
 
     def return_home(self):
         self._pub_home.publish(Empty())
+
+    def arm_stop(self):
+        if self._arm_stop_svc.service_is_ready():
+            self._arm_stop_svc.call_async(Trigger.Request())
 
     def cancel_nav2(self):
         self._zero_vel_pub.publish(Twist())
@@ -101,6 +107,14 @@ class HardwarePanel(QWidget):
         row.addWidget(btn_cancel)
 
         layout.addLayout(row)
+
+        btn_arm_stop = QPushButton('🛑 ARM STOPP')
+        btn_arm_stop.setMinimumHeight(50)
+        btn_arm_stop.setStyleSheet(
+            'background: #cc0000; color: white; font-size: 14pt; font-weight: bold; border: 2px solid #ff4444;'
+        )
+        btn_arm_stop.clicked.connect(self._node.arm_stop)
+        layout.addWidget(btn_arm_stop)
 
     def set_image(self, qi):
         px = QPixmap.fromImage(qi)

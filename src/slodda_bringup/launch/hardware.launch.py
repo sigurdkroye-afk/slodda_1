@@ -76,6 +76,13 @@ def generate_launch_description():
         parameters=[hw, {'publish_hz': 50.0, 'frame_id': 'imu_link', 'i2c_address': 0x28}]
     )
 
+    arm_controller = Node(
+        package='slodda_bringup',
+        executable='arm_controller_node',
+        name='arm_controller',
+        output='screen',
+    )
+
     motor_driver = Node(
         package='slodda_bringup',
         executable='motor_driver',
@@ -197,6 +204,7 @@ def generate_launch_description():
         static_map_to_odom,
         lidar_node,
         imu_node,
+        arm_controller,
         motor_driver,
         # Phase 2: t=4s — odometry + EKF (IMU-only yaw)
         TimerAction(period=4.0, actions=[
