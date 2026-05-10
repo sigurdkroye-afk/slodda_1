@@ -1,3 +1,4 @@
+import numpy as np
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
@@ -13,26 +14,30 @@ class CameraNode(Node):
 
         self.picam2 = Picamera2()
         self.picam2.configure(
-            self.picam2.create_preview_configuration(
-                main={"format": "RGB888", "size": (640, 480)}
+            self.picam2.create_video_configuration(
+                main={"format": "BGR888", "size": (640, 480)}
             )
         )
         self.picam2.start()
-        time.sleep(3)
-        self.picam2.set_controls({"AwbEnable": True, "AwbMode": controls.AwbModeEnum.Tungsten})
         time.sleep(2)
+        self.picam2.set_controls({"AwbEnable": True, "AwbMode": controls.AwbModeEnum.Auto})
 
         self.get_logger().info("Kamera klar — publiserer paa /camera/image_raw")
         self.create_timer(0.1, self.publish_frame)
 
     def publish_frame(self):
-        frame = self.picam2.capture_array()
+        frame = self.picam2.capture_array("main")
+        # Ensure 3-channel contiguous array
+        if frame.ndim == 3 and frame.shape[2] == 4:
+            frame = frame[:, :, :3]
+        frame = np.ascontiguousarray(frame)
+
         msg = Image()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "camera"
+        msg.header.frame_id = "camera_link"
         msg.height = frame.shape[0]
         msg.width = frame.shape[1]
-        msg.encoding = "rgb8"
+        msg.encoding = "bgr8"
         msg.is_bigendian = False
         msg.step = frame.shape[1] * 3
         msg.data = frame.tobytes()

@@ -13,6 +13,7 @@ def generate_launch_description():
 
     nav2_params = os.path.join(pkg_bringup, 'config', 'nav2_params.yaml')
     map_file    = os.path.join(pkg_gazebo,  'maps',   'arena_map.yaml')
+    bt_xml      = os.path.join(pkg_bringup, 'behavior_trees', 'navigate_to_pose_no_spin.xml')
 
     sim_time = {'use_sim_time': True}
 
@@ -76,7 +77,7 @@ def generate_launch_description():
         executable='bt_navigator',
         name='bt_navigator',
         output='screen',
-        parameters=[sim_time, nav2_params]
+        parameters=[sim_time, nav2_params, {'default_nav_to_pose_bt_xml': bt_xml}]
     )
 
     # Lifecycle managers must NOT use sim_time — their service_timeout must be
@@ -115,22 +116,22 @@ def generate_launch_description():
         }]
     )
 
-    # Localization nodes at 10 s — gives Gazebo time to fully load
+    # Localization nodes at 12 s — gives Gazebo time to fully load
     localization_nodes = TimerAction(
-        period=10.0,
+        period=12.0,
         actions=[map_server, amcl]
     )
 
     # Lifecycle manager starts 5 s AFTER the nodes it manages, avoiding the
     # race where change_state is called before the node has advertised its services.
     lifecycle_localization = TimerAction(
-        period=15.0,
+        period=17.0,
         actions=[lifecycle_manager_localization]
     )
 
-    # Navigation nodes at 18 s
+    # Navigation nodes at 25 s — extra margin for slow Gazebo physics start
     navigation_nodes = TimerAction(
-        period=18.0,
+        period=25.0,
         actions=[
             controller_server,
             planner_server,
@@ -142,7 +143,7 @@ def generate_launch_description():
 
     # Lifecycle manager for navigation 5 s after navigation nodes
     lifecycle_navigation = TimerAction(
-        period=23.0,
+        period=30.0,
         actions=[lifecycle_manager_navigation]
     )
 
@@ -163,28 +164,28 @@ def generate_launch_description():
         navigation_nodes,
         lifecycle_navigation,
         rviz,
-        TimerAction(
-            period=28.0,
-            actions=[
-                Node(
-                    package='slodda_bringup',
-                    executable='yolo_detector',
-                    name='yolo_detector',
-                    output='screen'
-                ),
-                Node(
-                    package='slodda_bringup',
-                    executable='mission_control',
-                    name='mission_control',
-                    output='screen',
-                    parameters=[{'image_width': 640}]
-                ),
-                Node(
-                    package='slodda_bringup',
-                    executable='camera_control_panel',
-                    name='camera_control_panel',
-                    output='screen'
-                ),
-            ]
-        ),
+        # TimerAction(
+        #     period=28.0,
+        #     actions=[
+        #         Node(
+        #             package='slodda_bringup',
+        #             executable='yolo_detector',
+        #             name='yolo_detector',
+        #             output='screen'
+        #         ),
+        #         Node(
+        #             package='slodda_bringup',
+        #             executable='mission_control',
+        #             name='mission_control',
+        #             output='screen',
+        #             parameters=[{'image_width': 640}]
+        #         ),
+        #         Node(
+        #             package='slodda_bringup',
+        #             executable='camera_control_panel',
+        #             name='camera_control_panel',
+        #             output='screen'
+        #         ),
+        #     ]
+        # ),
     ])
