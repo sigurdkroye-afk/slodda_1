@@ -9,7 +9,7 @@
       <PipelineSequence name="NavigateWithReplanning">
         <ControllerSelector selected_controller="{selected_controller}" default_controller="FollowPath" topic_name="controller_selector"/>
         <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased" topic_name="planner_selector"/>
-        <RateController hz="0.5">
+        <RateController hz="2.0">
           <RecoveryNode number_of_retries="1" name="ComputePathToPose">
             <ComputePathToPose goal="{goal}" path="{path}" planner_id="{selected_planner}" error_code_id="{compute_path_error_code}" error_msg="{compute_path_error_msg}" server_timeout="5000"/>
             <Sequence>
@@ -34,13 +34,13 @@
         <ReactiveFallback name="RecoveryFallback">
           <GoalUpdated/>
           <RoundRobin name="RecoveryActions">
+            <Sequence name="ClearingActions">
+              <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
+            </Sequence>
             <Sequence name="ClearThenBackUp">
               <ClearEntireCostmap name="ClearLocalCostmap-PreBackUp" service_name="local_costmap/clear_entirely_local_costmap"/>
               <Wait wait_duration="1.5" error_code_id="{wait_error_code}" error_msg="{wait_error_msg}" server_timeout="5000"/>
               <BackUp backup_dist="0.20" backup_speed="0.08" error_code_id="{backup_error_code}" error_msg="{backup_error_msg}" server_timeout="6000"/>
-            </Sequence>
-            <Sequence name="ClearingActions">
-              <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
             </Sequence>
             <Wait wait_duration="2.0" error_code_id="{wait_error_code}" error_msg="{wait_error_msg}" server_timeout="5000"/>
           </RoundRobin>
