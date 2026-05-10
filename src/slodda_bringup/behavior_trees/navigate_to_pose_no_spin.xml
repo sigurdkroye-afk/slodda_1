@@ -11,7 +11,10 @@
         <PlannerSelector selected_planner="{selected_planner}" default_planner="GridBased" topic_name="planner_selector"/>
         <RateController hz="2.0">
           <RecoveryNode number_of_retries="1" name="ComputePathToPose">
-            <ComputePathToPose goal="{goal}" path="{path}" planner_id="{selected_planner}" error_code_id="{compute_path_error_code}" error_msg="{compute_path_error_msg}" server_timeout="5000"/>
+            <Sequence>
+              <ComputePathToPose goal="{goal}" path="{path}" planner_id="{selected_planner}" error_code_id="{compute_path_error_code}" error_msg="{compute_path_error_msg}" server_timeout="5000"/>
+              <SmoothPath unsmoothed_path="{path}" smoothed_path="{path}" smoother_id="simple_smoother" error_code_id="{smoother_error_code}" error_msg="{smoother_error_msg}" server_timeout="2000"/>
+            </Sequence>
             <Sequence>
               <WouldAPlannerRecoveryHelp error_code="{compute_path_error_code}"/>
               <ClearEntireCostmap name="ClearLocalCostmap-PlannerCtx" service_name="local_costmap/clear_entirely_local_costmap"/>
