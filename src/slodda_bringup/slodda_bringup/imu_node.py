@@ -20,6 +20,7 @@ speed is set by the OS. For BNO085 reliability on Pi 4, add this line to
 """
 import time
 import threading
+import concurrent.futures as _futures
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
@@ -119,9 +120,12 @@ class ImuNode(Node):
     # ── Background read loop ─────────────────────────────────────────────────
 
     def _read_loop(self):
-        """Reads at _READ_HZ. Re-enables features after sensor self-reset."""
+        """Reads at _READ_HZ with 1s I2C timeout. Re-enables features after reset."""
         interval = 1.0 / _READ_HZ
         last_reenable_t = 0.0
+        executor = _futures.ThreadPoolExecutor(max_workers=1)
+        print('[imu_node] read_loop started', flush=True)
+
         while rclpy.ok():
             if self._bno is None:
                 if time.time() - self._last_reinit_t >= _REINIT_COOLDOWN_S:
@@ -130,8 +134,6 @@ class ImuNode(Node):
                 continue
 
             now = time.time()
-            # Sensor self-resets every ~15s on sw I2C. Re-enable features
-            # (cheap — no I2C re-open needed) when samples go stale.
             if (self._data_t > 0.0
                     and now - self._data_t > _REENABLE_STALE_S
                     and now - last_reenable_t > _REENABLE_COOLDOWN_S):
@@ -151,17 +153,31 @@ class ImuNode(Node):
                 time.sleep(interval)
                 continue
 
+            # Wrap I2C read in 1s timeout — software I2C can block forever
             try:
-                q = self._bno.game_quaternion
+                future = executor.submit(lambda: self._bno.game_quaternion)
+                try:
+                    q = future.result(timeout=1.0)
+                except _futures.TimeoutError:
+                    self.get_logger().warn(
+                        'BNO085 I2C timed out — skipping sample',
+                        throttle_duration_sec=5.0)
+                    time.sleep(interval)
+                    continue
+
                 if q is None:
                     self.get_logger().warn(
-                        'BNO085 game_quaternion=None (sensor not ready yet)',
+                        'BNO085 game_quaternion=None',
                         throttle_duration_sec=5.0)
                     time.sleep(interval)
                     continue
 
                 qi, qj, qk, qr = q
-                if not (0.9 < (qi*qi + qj*qj + qk*qk + qr*qr) < 1.1):
+                norm2 = qi*qi + qj*qj + qk*qk + qr*qr
+                if not (0.9 < norm2 < 1.1):
+                    self.get_logger().warn(
+                        f'BNO085 bad norm {norm2:.3f} — dropping',
+                        throttle_duration_sec=5.0)
                     time.sleep(interval)
                     continue
 
@@ -179,6 +195,7 @@ class ImuNode(Node):
                 with self._lock:
                     self._data   = (qi, qj, qk, qr, gx, gy, gz, ax, ay, az)
                     self._data_t = time.time()
+                print(f'[imu_node] published q=({qi:.3f},{qj:.3f},{qk:.3f},{qr:.3f})', flush=True)
 
             except Exception as e:
                 self.get_logger().warn(
