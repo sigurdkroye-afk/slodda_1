@@ -95,6 +95,7 @@ class ImuNode(Node):
             self._bno = BNO08X_I2C(
                 i2c, address=self.get_parameter('i2c_address').value,
                 debug=False)
+            time.sleep(0.5)  # let sensor process advertisement packet
             for feature in (BNO_REPORT_GAME_ROTATION_VECTOR,
                             BNO_REPORT_GYROSCOPE,
                             BNO_REPORT_LINEAR_ACCELERATION):
@@ -153,6 +154,9 @@ class ImuNode(Node):
             try:
                 q = self._bno.game_quaternion
                 if q is None:
+                    self.get_logger().warn(
+                        'BNO085 game_quaternion=None (sensor not ready yet)',
+                        throttle_duration_sec=5.0)
                     time.sleep(interval)
                     continue
 
