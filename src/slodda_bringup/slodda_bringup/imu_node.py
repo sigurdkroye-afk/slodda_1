@@ -42,10 +42,12 @@ _ORI_VAR   = 4e-6    # rad²
 _GYRO_VAR  = 8.1e-5  # rad²/s²
 _ACCEL_VAR = 4.4e-4  # m²/s⁴
 
-_REINIT_COOLDOWN_S      = 30.0 # rarely reinit — only on hard failures
-_READ_HZ                = 5    # 5 Hz: less I2C traffic = fewer corrupt packets
-_STALE_DATA_TIMEOUT_S   = 2.0  # skip publish if sample older than this
-_POST_REINIT_VALIDATE_S = 3.0  # skip publish for this long after reinit
+_REINIT_COOLDOWN_S      = 30.0  # rarely reinit — only on hard failures
+_READ_HZ                = 5     # 5 Hz: less I2C traffic = fewer corrupt packets
+_STALE_DATA_TIMEOUT_S   = 2.0   # skip publish if sample older than this
+_POST_REINIT_VALIDATE_S = 0.0   # norm-validation is the safety filter, no time block
+_REENABLE_STALE_S       = 2.0   # re-enable features if no valid sample in 2s
+_REENABLE_COOLDOWN_S    = 3.0   # min time between re-enable attempts
 
 
 def _diag9(v: float):
@@ -87,38 +89,22 @@ class ImuNode(Node):
     # ── Sensor init / reinit ─────────────────────────────────────────────────
 
     def _init_sensor(self) -> bool:
-        """Initialize or reinitialize the BNO085. Blocks ~2–5 s."""
+        """Initialize the BNO085. Blocks ~1.5 s."""
         try:
             i2c = busio.I2C(board.SCL, board.SDA, frequency=50_000)
             self._bno = BNO08X_I2C(
                 i2c, address=self.get_parameter('i2c_address').value,
                 debug=False)
-            time.sleep(1.0)
             for feature in (BNO_REPORT_GAME_ROTATION_VECTOR,
                             BNO_REPORT_GYROSCOPE,
                             BNO_REPORT_LINEAR_ACCELERATION):
-                for attempt in range(5):
-                    try:
-                        self._bno.enable_feature(feature)
-                        time.sleep(0.3)
-                        break
-                    except Exception:
-                        if attempt == 4:
-                            raise
-                        time.sleep(0.5)
+                try:
+                    self._bno.enable_feature(feature)
+                except Exception:
+                    time.sleep(0.2)
+                    self._bno.enable_feature(feature)  # one retry
             self._consecutive_errors = 0
             self._last_reinit_t      = time.time()
-            # Warmup: discard initial SHTP advertisement packets (can be 272 bytes)
-            # before declaring the sensor ready to read.
-            t0 = time.time()
-            while time.time() - t0 < 3.0:
-                try:
-                    q = self._bno.game_quaternion
-                    if q is not None and q[3] != 0.0:
-                        break
-                except Exception:
-                    pass
-                time.sleep(0.05)
             self._reinit_completed_t = time.time()
             self.get_logger().info('BNO085 (re)initialized OK.')
             return True
@@ -132,12 +118,35 @@ class ImuNode(Node):
     # ── Background read loop ─────────────────────────────────────────────────
 
     def _read_loop(self):
-        """Reads the sensor at _READ_HZ. Drops corrupt samples, never reinits."""
+        """Reads at _READ_HZ. Re-enables features after sensor self-reset."""
         interval = 1.0 / _READ_HZ
+        last_reenable_t = 0.0
         while rclpy.ok():
             if self._bno is None:
                 if time.time() - self._last_reinit_t >= _REINIT_COOLDOWN_S:
                     self._init_sensor()
+                time.sleep(interval)
+                continue
+
+            now = time.time()
+            # Sensor self-resets every ~15s on sw I2C. Re-enable features
+            # (cheap — no I2C re-open needed) when samples go stale.
+            if (self._data_t > 0.0
+                    and now - self._data_t > _REENABLE_STALE_S
+                    and now - last_reenable_t > _REENABLE_COOLDOWN_S):
+                try:
+                    for feature in (BNO_REPORT_GAME_ROTATION_VECTOR,
+                                    BNO_REPORT_GYROSCOPE,
+                                    BNO_REPORT_LINEAR_ACCELERATION):
+                        self._bno.enable_feature(feature)
+                    last_reenable_t = time.time()
+                    self.get_logger().info(
+                        'BNO085 features re-enabled after suspected reset.',
+                        throttle_duration_sec=5.0)
+                except Exception as e:
+                    self.get_logger().warn(
+                        f'BNO085 re-enable failed: {e}',
+                        throttle_duration_sec=5.0)
                 time.sleep(interval)
                 continue
 
@@ -148,12 +157,10 @@ class ImuNode(Node):
                     continue
 
                 qi, qj, qk, qr = q
-                # Validate quaternion norm — drop corrupt samples silently
                 if not (0.9 < (qi*qi + qj*qj + qk*qk + qr*qr) < 1.1):
                     time.sleep(interval)
                     continue
 
-                # Read gyro/accel with isolated exception handling
                 try:
                     g = self._bno.gyro
                     gx, gy, gz = g if g is not None else (0.0, 0.0, 0.0)
@@ -170,7 +177,6 @@ class ImuNode(Node):
                     self._data_t = time.time()
 
             except Exception as e:
-                # Drop this sample — sensor recovers on next read
                 self.get_logger().warn(
                     f'BNO085 sample dropped: {e}', throttle_duration_sec=10.0)
 
