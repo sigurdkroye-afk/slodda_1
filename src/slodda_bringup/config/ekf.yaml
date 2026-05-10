@@ -13,27 +13,27 @@ ekf_filter_node:
     base_link_frame: base_footprint
     world_frame:     odom
 
-    # Wheel odometry — vx + vyaw (encoder yaw, BNO085 unavailable via I2C).
+    # Wheel odometry — kun vx (encoder yaw upålitelig på belteroboten).
     odom0: /odom
     odom0_config: [false, false, false,
                    false, false, false,
                    true,  false, false,
-                   false, false, true,
+                   false, false, false,
                    false, false, false]
     odom0_differential: false
     odom0_relative: false
     odom0_queue_size: 5
     odom0_nodelay: true
 
-    # IMU — BNO055 over hardware I2C, yaw + yaw rate til EKF.
+    # IMU — BNO055, kun vyaw (gyro yaw rate). Encoder vyaw fjernet — belter glir.
     imu0: /imu/data
     imu0_config: [false, false, false,
-                  false, false, true,
+                  false, false, false,
                   false, false, false,
                   false, false, true,
                   false, false, false]
     imu0_differential: false
-    imu0_relative: true
+    imu0_relative: false
     imu0_remove_gravity_acceleration: true
     imu0_queue_size: 10
     imu0_nodelay: true
