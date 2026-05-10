@@ -42,11 +42,10 @@ _ORI_VAR   = 4e-6    # rad²
 _GYRO_VAR  = 8.1e-5  # rad²/s²
 _ACCEL_VAR = 4.4e-4  # m²/s⁴
 
-_REINIT_AFTER_ERRORS    = 50   # consecutive read failures before re-init
-_REINIT_COOLDOWN_S      = 5.0  # seconds to wait between re-init attempts
-_READ_HZ                = 20   # background read rate; publish_hz ≤ this
-_STALE_DATA_TIMEOUT_S   = 2.0  # skip publish if sample older than this (sw I2C is slower)
-_POST_REINIT_VALIDATE_S = 2.0  # skip publish for this long after reinit
+_REINIT_COOLDOWN_S      = 30.0 # rarely reinit — only on hard failures
+_READ_HZ                = 5    # 5 Hz: less I2C traffic = fewer corrupt packets
+_STALE_DATA_TIMEOUT_S   = 2.0  # skip publish if sample older than this
+_POST_REINIT_VALIDATE_S = 3.0  # skip publish for this long after reinit
 
 
 def _diag9(v: float):
@@ -133,7 +132,7 @@ class ImuNode(Node):
     # ── Background read loop ─────────────────────────────────────────────────
 
     def _read_loop(self):
-        """Reads the sensor at _READ_HZ; reinits on persistent failure."""
+        """Reads the sensor at _READ_HZ. Drops corrupt samples, never reinits."""
         interval = 1.0 / _READ_HZ
         while rclpy.ok():
             if self._bno is None:
@@ -143,28 +142,37 @@ class ImuNode(Node):
                 continue
 
             try:
-                q  = self._bno.game_quaternion
-                g  = self._bno.gyro
-                a  = self._bno.linear_acceleration
-                if q is None or g is None or a is None:
+                q = self._bno.game_quaternion
+                if q is None:
                     time.sleep(interval)
                     continue
+
                 qi, qj, qk, qr = q
-                gx, gy, gz      = g
-                ax, ay, az      = a
+                # Validate quaternion norm — drop corrupt samples silently
+                if not (0.9 < (qi*qi + qj*qj + qk*qk + qr*qr) < 1.1):
+                    time.sleep(interval)
+                    continue
+
+                # Read gyro/accel with isolated exception handling
+                try:
+                    g = self._bno.gyro
+                    gx, gy, gz = g if g is not None else (0.0, 0.0, 0.0)
+                except Exception:
+                    gx, gy, gz = 0.0, 0.0, 0.0
+                try:
+                    a = self._bno.linear_acceleration
+                    ax, ay, az = a if a is not None else (0.0, 0.0, 0.0)
+                except Exception:
+                    ax, ay, az = 0.0, 0.0, 0.0
+
                 with self._lock:
                     self._data   = (qi, qj, qk, qr, gx, gy, gz, ax, ay, az)
                     self._data_t = time.time()
-                self._consecutive_errors = 0
+
             except Exception as e:
-                self._consecutive_errors += 1
+                # Drop this sample — sensor recovers on next read
                 self.get_logger().warn(
-                    f'BNO085 read error: {e} (#{self._consecutive_errors})',
-                    throttle_duration_sec=5.0)
-                if self._consecutive_errors >= _REINIT_AFTER_ERRORS:
-                    self.get_logger().error(
-                        'BNO085: too many errors — triggering reinit')
-                    self._bno = None  # next iteration calls _init_sensor
+                    f'BNO085 sample dropped: {e}', throttle_duration_sec=10.0)
 
             time.sleep(interval)
 
