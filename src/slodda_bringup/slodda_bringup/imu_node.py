@@ -18,9 +18,11 @@ speed is set by the OS. For BNO085 reliability on Pi 4, add this line to
     dtparam=i2c_arm_baudrate=10000
 10 kHz eliminates the clock-stretching NACK errors (OSError 123/133).
 """
+import atexit
 import time
 import threading
 import concurrent.futures as _futures
+import concurrent.futures.thread as _cft
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
@@ -124,7 +126,7 @@ class ImuNode(Node):
         interval = 1.0 / _READ_HZ
         last_reenable_t = 0.0
         executor = _futures.ThreadPoolExecutor(max_workers=1)
-        print('[imu_node] read_loop started', flush=True)
+        atexit.unregister(_cft._python_exit)
 
         while rclpy.ok():
             if self._bno is None:
@@ -195,7 +197,6 @@ class ImuNode(Node):
                 with self._lock:
                     self._data   = (qi, qj, qk, qr, gx, gy, gz, ax, ay, az)
                     self._data_t = time.time()
-                print(f'[imu_node] published q=({qi:.3f},{qj:.3f},{qk:.3f},{qr:.3f})', flush=True)
 
             except Exception as e:
                 self.get_logger().warn(
