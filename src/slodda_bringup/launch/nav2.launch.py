@@ -164,28 +164,28 @@ def generate_launch_description():
         navigation_nodes,
         lifecycle_navigation,
         rviz,
-        TimerAction(
-            period=28.0,
-            actions=[
-                Node(
-                    package='slodda_bringup',
-                    executable='yolo_detector',
-                    name='yolo_detector',
-                    output='screen'
-                ),
-                Node(
-                    package='slodda_bringup',
-                    executable='mission_control',
-                    name='mission_control',
-                    output='screen',
-                    parameters=[{'image_width': 640}]
-                ),
-                Node(
-                    package='slodda_bringup',
-                    executable='camera_control_panel',
-                    name='camera_control_panel',
-                    output='screen'
-                ),
-            ]
-        ),
+        # TimerAction(
+        #     period=28.0,
+        #     actions=[
+        #         Node(
+        #             package='slodda_bringup',
+        #             executable='yolo_detector',
+        #             name='yolo_detector',
+        #             output='screen'
+        #         ),
+        #         Node(
+        #             package='slodda_bringup',
+        #             executable='mission_control',
+        #             name='mission_control',
+        #             output='screen',
+        #             parameters=[{'image_width': 640}]
+        #         ),
+        #         Node(
+        #             package='slodda_bringup',
+        #             executable='camera_control_panel',
+        #             name='camera_control_panel',
+        #             output='screen'
+        #         ),
+        #     ]
+        # ),
     ])
