@@ -27,7 +27,7 @@ class ArmControllerNode(Node):
             self.get_logger().error('pyserial ikke installert — pip install pyserial')
         else:
             try:
-                self._ser = serial.Serial('/dev/ttyAMA0', 115200, timeout=0.1)
+                self._ser = serial.Serial('/dev/ttyS0', 115200, timeout=0.1)
                 self.get_logger().info('Serial /dev/ttyAMA0 åpnet.')
             except Exception as e:
                 self.get_logger().error(f'Kan ikke åpne /dev/ttyAMA0: {e}')
