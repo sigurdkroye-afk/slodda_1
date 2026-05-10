@@ -42,11 +42,11 @@ _ORI_VAR   = 4e-6    # rad²
 _GYRO_VAR  = 8.1e-5  # rad²/s²
 _ACCEL_VAR = 4.4e-4  # m²/s⁴
 
-_REINIT_AFTER_ERRORS    = 5    # consecutive read failures before re-init
+_REINIT_AFTER_ERRORS    = 50   # consecutive read failures before re-init
 _REINIT_COOLDOWN_S      = 5.0  # seconds to wait between re-init attempts
 _READ_HZ                = 20   # background read rate; publish_hz ≤ this
-_STALE_DATA_TIMEOUT_S   = 0.20 # skip publish if sample older than this
-_POST_REINIT_VALIDATE_S = 0.5  # skip publish for this long after reinit
+_STALE_DATA_TIMEOUT_S   = 2.0  # skip publish if sample older than this (sw I2C is slower)
+_POST_REINIT_VALIDATE_S = 2.0  # skip publish for this long after reinit
 
 
 def _diag9(v: float):
@@ -109,6 +109,17 @@ class ImuNode(Node):
                         time.sleep(0.5)
             self._consecutive_errors = 0
             self._last_reinit_t      = time.time()
+            # Warmup: discard initial SHTP advertisement packets (can be 272 bytes)
+            # before declaring the sensor ready to read.
+            t0 = time.time()
+            while time.time() - t0 < 3.0:
+                try:
+                    q = self._bno.game_quaternion
+                    if q is not None and q[3] != 0.0:
+                        break
+                except Exception:
+                    pass
+                time.sleep(0.05)
             self._reinit_completed_t = time.time()
             self.get_logger().info('BNO085 (re)initialized OK.')
             return True
@@ -132,9 +143,15 @@ class ImuNode(Node):
                 continue
 
             try:
-                qi, qj, qk, qr = self._bno.game_quaternion
-                gx, gy, gz      = self._bno.gyro
-                ax, ay, az      = self._bno.linear_acceleration
+                q  = self._bno.game_quaternion
+                g  = self._bno.gyro
+                a  = self._bno.linear_acceleration
+                if q is None or g is None or a is None:
+                    time.sleep(interval)
+                    continue
+                qi, qj, qk, qr = q
+                gx, gy, gz      = g
+                ax, ay, az      = a
                 with self._lock:
                     self._data   = (qi, qj, qk, qr, gx, gy, gz, ax, ay, az)
                     self._data_t = time.time()
