@@ -1,208 +1,206 @@
 # Slødda 1 — MEPA2002 Mekatronikk 4
 
-Autonomous tracked rescue robot with Nav2 navigation, YOLO-based object detection, and a full bear-mission state machine. Built with ROS 2 Kilted + Gazebo Harmonic.
+Autonom belterobot med ROS 2 Kilted, Nav2-navigasjon og YOLO-basert bjørn-deteksjon.
+Bygd på Raspberry Pi 4 med BNO055 IMU, LD06 lidar og DFR0601 motorer.
+
+> **Status:** Bekreftet stabil navigasjon på fysisk robot per 2026-05-10.
+> Sim-stacken (Gazebo) er beholdt, men hovedfokus er hardware.
 
 ---
 
-## System Overview
+## Hurtiglenker
 
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        MISSION CONTROL                          │
-│                                                                 │
-│  IDLE ──► NAVIGATE ──► CANCELING ──► TRACK_BEAR ──► AT_BEAR    │
-│    ▲          │                           │            │        │
-│    │          │   (bear spotted)          │ (aligned)  │        │
-│    └──────────┴───────────────────────────┴────────────┘        │
-│                                                APPROVE ▼        │
-│                                           RETURN_HOME ──► IDLE  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-| State | Description |
-|---|---|
-| `IDLE` | Waiting for a Nav2 `2D Goal Pose` from RViz. YOLO disarmed. |
-| `NAVIGATE` | Nav2 drives toward the goal. YOLO armed — triggers override if bear visible. |
-| `CANCELING` | 1.5 s zero-velocity hold after cancelling Nav2 goal — ensures `controller_server` stops. |
-| `TRACK_BEAR` | Camera + LiDAR P-controller: rotate to centre bear, then approach to 20 cm. |
-| `AT_BEAR` | Stopped at bear, waiting for `APPROVE` command before returning. |
-| `RETURN_HOME` | Replays the recorded odometry path in reverse at 15 cm/s. YOLO disarmed. |
-
-### YOLO-triggered navigation override
-
-While in `NAVIGATE`, the YOLO detector runs at 5 Hz on class 77 (teddy bear). Three consecutive detections arm the override. Nav2's goal is cancelled, the robot holds zero velocity for 1.5 s (so Nav2's `controller_server` drains its `/cmd_vel` output), then transitions directly to `TRACK_BEAR`.
-
-### Tracking controller (TRACK_BEAR)
-
-Two-phase approach:
-1. **Rotate** — zero linear velocity, proportional angular control on pixel error until bear is centred (< 20 px error).
-2. **Approach** — proportional linear control on LiDAR distance to 20 cm target. Drift correction re-centres bear if pixel error exceeds 30 px. LiDAR readings below 5 cm trigger immediate `AT_BEAR`. Fallback: if LiDAR returns `inf` (bear beyond 2 m), creep forward at 5 cm/s while maintaining alignment.
-
-### Return-home path replay
-
-During `NAVIGATE`, `CANCELING`, and `TRACK_BEAR`, the robot records odometry waypoints every 5 cm (up to 500 points). On `RETURN_HOME`, this path is reversed and replayed at 15 cm/s with proportional angular correction toward each waypoint heading.
+- [docs/CHEATSHEET.md](docs/CHEATSHEET.md) — kompakt kommandoreferanse
+- [docs/RASPBERRY_PI_SETUP.md](docs/RASPBERRY_PI_SETUP.md) — full Pi-installasjon fra blank SD
 
 ---
 
-## Packages
+## 1. Hardware
 
-| Package | Description |
-|---|---|
-| `slodda_bringup` | All Python nodes, Nav2 config, launch files |
-| `slodda_description` | URDF/Xacro robot model, RViz config |
-| `slodda_gazebo` | Gazebo world, arena map, sim launch |
-| `slodda_vision` | Camera node (real robot) |
-| `slodda_rviz_panel` | Custom RViz control panel plugin |
-
-### Key nodes
-
-| Node | Executable | Description |
+| Komponent | Tilkobling | Detaljer |
 |---|---|---|
-| Mission control | `mission_control` | Main state machine (Nav2 + tracking + return-home) |
-| YOLO detector | `yolo_detector` | YOLOv8n on `/camera/image_raw`, publishes `/yolo/detections` |
-| Object tracker | `object_tracker` | Color-based (red) fallback tracker |
-| Motor driver | `motor_driver` | `/cmd_vel` → PWM on real robot (configure GPIO pins before use) |
-| A* planner | `astar_planner` | Custom grid planner |
-| APF controller | `apf_controller` | Artificial potential field controller |
+| Raspberry Pi 4 (4 GB) | — | Ubuntu Server 24.04, ROS 2 Kilted |
+| BNO055 IMU | I2C1 (GPIO 2/3), adresse `0x28` | Hardware I2C 400 kHz, `Adafruit_BNO055` |
+| LD06 lidar | UART3 (GPIO 4/5), `/dev/ttyAMA3` | 230 400 baud |
+| DFR0601 motorer | GPIO 18/19 PWM, 23/24/25/26 dir | 663 ticks/rev encoder |
+
+Wheelbase: 0.2316 m — Hjulradius: 0.01021 m (kalibrert mot målt distanse)
 
 ---
 
-## ROS 2 Topics
+## 2. Pi-oppsett
 
-| Topic | Type | Description |
-|---|---|---|
-| `/cmd_vel` | `geometry_msgs/Twist` | Velocity commands (IN) |
-| `/odom` | `nav_msgs/Odometry` | Odometry (OUT) |
-| `/scan` | `sensor_msgs/LaserScan` | LiDAR — LD06 (OUT) |
-| `/camera/image_raw` | `sensor_msgs/Image` | Raw camera (OUT) |
-| `/yolo/detections` | `vision_msgs/Detection2DArray` | YOLO bear detections (OUT) |
-| `/yolo/image` | `sensor_msgs/Image` | Annotated camera image (OUT) |
-| `/goal_pose` | `geometry_msgs/PoseStamped` | 2D Nav goal from RViz (IN) |
-| `/mission/cmd` | `std_msgs/String` | Mission commands: `APPROVE`, `CANCEL`, `CANCEL_RETURN` (IN) |
-| `/mission/status` | `std_msgs/String` | Current state, published at 10 Hz (OUT) |
-| `/joint_states` | `sensor_msgs/JointState` | Wheel joint positions (OUT) |
-| `/imu/data` | `sensor_msgs/Imu` | IMU (OUT) |
-| `/ir_front_left/center/right` | `sensor_msgs/LaserScan` | IR distance sensors (OUT) |
-| `/tf` | `tf2_msgs/TFMessage` | Transform tree (OUT) |
+> Antar Ubuntu Server 24.04 og ROS 2 Kilted er installert.
+> Full installasjon fra blank SD: se `docs/RASPBERRY_PI_SETUP.md`.
 
----
+### 2.1 Aktiver hardware I2C og UART3
 
-## Quick Start — Simulation
+```bash
+sudo nano /boot/firmware/config.txt
+```
 
-**Prerequisites:** Ubuntu 24.04 LTS, ROS 2 Kilted, Gazebo Harmonic.
+Legg til / endre:
+```
+dtoverlay=uart3
+dtparam=i2c_arm=on,i2c_arm_baudrate=400000
+```
 
-### 1. Clone and build
+Reboot, deretter verifiser:
+```bash
+ls /dev/ttyAMA3        # skal finnes
+i2cdetect -y 1         # skal vise 0x28 (BNO055)
+```
+
+### 2.2 Python-biblioteker
+
+```bash
+pip install Adafruit_BNO055 --break-system-packages
+```
+
+### 2.3 ROS 2-avhengigheter
+
+```bash
+sudo apt install -y \
+  ros-kilted-xacro ros-kilted-robot-localization \
+  ros-kilted-nav2-behaviors ros-kilted-nav2-bt-navigator \
+  ros-kilted-nav2-controller ros-kilted-nav2-lifecycle-manager \
+  ros-kilted-nav2-planner ros-kilted-nav2-smoother \
+  ros-kilted-robot-state-publisher ros-kilted-tf2-ros \
+  i2c-tools
+```
+
+### 2.4 Klon og bygg
 
 ```bash
 git clone https://github.com/sigurdkroye-afk/slodda_1.git ~/slodda_1
 cd ~/slodda_1
-rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
 source install/setup.bash
 ```
 
-Add convenience aliases to `~/.bashrc`:
-
+Legg til i `~/.bashrc`:
 ```bash
-echo "source /opt/ros/kilted/setup.bash"           >> ~/.bashrc
-echo "source ~/slodda_1/install/setup.bash"        >> ~/.bashrc
-echo "alias cb='cd ~/slodda_1 && colcon build --symlink-install'" >> ~/.bashrc
-echo "alias cs='source ~/slodda_1/install/setup.bash'"            >> ~/.bashrc
-echo "alias cw='cd ~/slodda_1'"                    >> ~/.bashrc
-source ~/.bashrc
-```
-
-### 2. Launch the full simulation stack
-
-```bash
-# Terminal 1 — Gazebo + Nav2 + RViz + YOLO + mission_control
-ros2 launch slodda_bringup sim.launch.py
-```
-
-Wait ~30 s for Nav2 lifecycle nodes to activate (the costmap appears in RViz when ready).
-
-### 3. Run a mission
-
-Use the **2D Goal Pose** button in RViz to set a navigation target. The robot will drive to the goal. If it spots the bear while navigating, it overrides Nav2 and approaches automatically.
-
-```bash
-# Approve at bear (after robot stops at bear):
-ros2 topic pub --once /mission/cmd std_msgs/msg/String "data: 'APPROVE'"
-
-# Cancel return home (emergency):
-ros2 topic pub --once /mission/cmd std_msgs/msg/String "data: 'CANCEL_RETURN'"
-
-# Watch mission state:
-ros2 topic echo /mission/status
-```
-
-### 4. Manual control
-
-```bash
-# Keyboard teleop:
-ros2 run teleop_twist_keyboard teleop_twist_keyboard
-
-# Stop robot:
-ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{}"
-```
-
----
-
-## Quick Start — Real Robot (Raspberry Pi)
-
-See [`docs/RASPBERRY_PI_SETUP.md`](docs/RASPBERRY_PI_SETUP.md) for full setup. See [`docs/CHEATSHEET.md`](docs/CHEATSHEET.md) for GPIO pin mapping and first-time Pi setup.
-
-### Hardware
-
-| Sensor/Aktuator | Tilkobling |
-|---|---|
-| Motorer (DFR0601) | GPIO 18/19 (PWM), 23/24 (venstre dir), 25/26 (høyre dir) |
-| LiDAR LD06 | GPIO 4/5 → UART3 (`/dev/ttyAMA3`) |
-| IMU BNO085 | GPIO 2/3 → I2C1, adresse `0x4a` |
-
-### Launch
-
-```bash
-# SSH:
-ssh slodda1@SloddaPi.local
-
-# Full stack:
 source /opt/ros/kilted/setup.bash
 source ~/slodda_1/install/setup.bash
-ros2 launch slodda_bringup hardware.launch.py
-
-# Bare motorer (testing):
-ros2 launch slodda_bringup motors_only.launch.py
-
-# On your laptop (same WiFi, same ROS_DOMAIN_ID):
 export ROS_DOMAIN_ID=42
-ros2 launch slodda_description view_real_robot.launch.py
+```
+
+### ⚠️ data_files-gotcha
+
+`slodda_bringup` er `ament_python` — launch-filer og YAML-konfig er **kopier** i `install/`.
+Etter `git pull` på Pi **alltid** kjør:
+
+```bash
+colcon build --packages-select slodda_bringup
 ```
 
 ---
 
-## Repository Layout
+## 3. Laptop-oppsett
+
+```bash
+git clone https://github.com/sigurdkroye-afk/slodda_1.git ~/slodda_1
+cd ~/slodda_1 && colcon build --symlink-install
+```
+
+Legg til i `~/.bashrc`:
+```bash
+source /opt/ros/kilted/setup.bash
+source ~/slodda_1/install/setup.bash
+export ROS_DOMAIN_ID=42
+```
+
+Begge maskiner må være på samme nettverk. Tailscale fungerer (Pi: `100.66.136.28`).
+
+---
+
+## 4. Kjøring
+
+### Pi — start full stack
+
+```bash
+ssh slodda1@sloddapi
+ros2 launch slodda_bringup hardware.launch.py
+```
+
+Oppstartsfaser (~30 s totalt):
+
+| Tid | Hva starter |
+|-----|-------------|
+| 0 s | robot_state_publisher, static map→odom TF, lidar, IMU, motor_driver |
+| 4 s | odometry_node, EKF |
+| 12 s | controller_server, planner_server |
+| 18 s | smoother_server, behavior_server, bt_navigator |
+| 30 s | lifecycle_manager → venter på `Managed nodes are active` |
+
+### Laptop — start RViz
+
+```bash
+ros2 run rviz2 rviz2 -d ~/slodda_1/src/slodda_bringup/config/hardware.rviz
+```
+
+### Verifiser at alt kjører
+
+```bash
+ros2 topic hz /scan              # ~10 Hz
+ros2 topic hz /imu/data          # ~50 Hz
+ros2 topic hz /odometry/filtered # ~12 Hz
+```
+
+### Spin-test (360° på stedet)
+
+```bash
+ros2 action send_goal /spin nav2_msgs/action/Spin "{target_yaw: 6.28}"
+```
+
+### Navigasjonsmål
+
+```bash
+ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+  "{pose: {header: {frame_id: 'map'}, pose: {position: {x: 1.0, y: 0.0, z: 0.0}, orientation: {w: 1.0}}}}"
+```
+
+Eller bruk **2D Nav Goal** i RViz.
+
+---
+
+## 5. EKF sensor fusion
+
+| Kilde | Topic | Bidrag |
+|---|---|---|
+| Encoder odometry | `/odom` | vx (fremover-hastighet) |
+| BNO055 gyro | `/imu/data` | vyaw (yaw-rate) |
+
+Encoder-yaw er deaktivert — belter glir ved rotasjon og gir unøyaktig yaw.
+IMU gyro er eneste yaw-rate-kilde. EKF publiserer `odom→base_footprint` TF.
+
+---
+
+## 6. Kjente problemer
+
+| Symptom | Årsak | Fiks |
+|---|---|---|
+| `BNO055 init failed` | I2C ikke aktivert | `i2cdetect -y 1` → sjekk `0x28`; verifiser `dtparam=i2c_arm=on` |
+| `Adafruit_BNO055 not installed` | Bibliotek mangler | `pip install Adafruit_BNO055 --break-system-packages` |
+| Nav2 aktiverer aldri | CPU overload eller bond-timeout | Vent 60 s; `htop`; reboot Pi |
+| Spin gjør for mange runder | Yaw-konflikt encoder/IMU | Bekreft `odom0_config` har vyaw=false i `ekf.yaml` |
+| Topics ikke synlig fra laptop | DOMAIN_ID feil | `echo $ROS_DOMAIN_ID` → skal vise `42` på begge |
+| Launch-endringer virker ikke | data_files er kopier | `colcon build --packages-select slodda_bringup` |
+
+---
+
+## 7. Repo-struktur
 
 ```
 slodda_1/
 ├── src/
-│   ├── slodda_bringup/         # Python nodes, Nav2 config, launch files
-│   ├── slodda_description/     # URDF, RViz config
-│   ├── slodda_gazebo/          # Gazebo world, arena map
-│   ├── slodda_vision/          # Camera node (real robot)
-│   └── slodda_rviz_panel/      # Custom RViz panel
+│   ├── slodda_bringup/        # Launch, Nav2-config, Python-noder (HOVEDPAKKE)
+│   ├── slodda_description/    # URDF/Xacro robot-modell
+│   ├── slodda_gazebo/         # Simulasjon (Gazebo Harmonic)
+│   ├── slodda_vision/         # Kamera og YOLO-deteksjon
+│   └── ldlidar_stl_ros2/      # LD06 lidar-driver
 ├── docs/
-│   ├── RASPBERRY_PI_SETUP.md   # Full Pi setup guide
-│   ├── CHEATSHEET.md           # ROS2 / Git quick reference
-│   └── guides/                 # Troubleshooting, setup guides
-├── firmware/                   # ESP32 / Arduino code
-└── scripts/                    # Utility scripts
+│   ├── CHEATSHEET.md          # Kompakt kommandoreferanse
+│   └── RASPBERRY_PI_SETUP.md  # Full Pi-installasjon
+└── README.md
 ```
-
----
-
-## Team — NTNU MEPA2002 2026
-
-- Sigurd Kristian Øye
-- Jostein
-- Isak
