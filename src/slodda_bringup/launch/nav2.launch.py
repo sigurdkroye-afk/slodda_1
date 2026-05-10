@@ -116,22 +116,22 @@ def generate_launch_description():
         }]
     )
 
-    # Localization nodes at 10 s — gives Gazebo time to fully load
+    # Localization nodes at 12 s — gives Gazebo time to fully load
     localization_nodes = TimerAction(
-        period=10.0,
+        period=12.0,
         actions=[map_server, amcl]
     )
 
     # Lifecycle manager starts 5 s AFTER the nodes it manages, avoiding the
     # race where change_state is called before the node has advertised its services.
     lifecycle_localization = TimerAction(
-        period=15.0,
+        period=17.0,
         actions=[lifecycle_manager_localization]
     )
 
-    # Navigation nodes at 18 s
+    # Navigation nodes at 25 s — extra margin for slow Gazebo physics start
     navigation_nodes = TimerAction(
-        period=18.0,
+        period=25.0,
         actions=[
             controller_server,
             planner_server,
@@ -143,7 +143,7 @@ def generate_launch_description():
 
     # Lifecycle manager for navigation 5 s after navigation nodes
     lifecycle_navigation = TimerAction(
-        period=23.0,
+        period=30.0,
         actions=[lifecycle_manager_navigation]
     )
 
