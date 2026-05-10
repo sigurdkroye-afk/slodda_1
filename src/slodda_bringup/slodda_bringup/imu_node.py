@@ -106,6 +106,19 @@ class ImuNode(Node):
                     self._bno.enable_feature(feature)  # one retry
             self._consecutive_errors = 0
             self._last_reinit_t      = time.time()
+            # Pre-flight: poll until first valid quaternion or timeout.
+            # This populates library's _readings dict before read_loop starts.
+            deadline = time.monotonic() + 5.0
+            while time.monotonic() < deadline:
+                try:
+                    q = self._bno.game_quaternion
+                    if q is not None:
+                        break
+                except Exception:
+                    pass
+                time.sleep(0.05)
+            else:
+                self.get_logger().warn('BNO085 gave no quaternion in 5s — starting loop anyway')
             self._reinit_completed_t = time.time()
             self.get_logger().info('BNO085 (re)initialized OK.')
             return True
