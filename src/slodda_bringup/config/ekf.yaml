@@ -15,35 +15,22 @@ ekf_filter_node:
     base_link_frame: base_footprint
     world_frame:     odom
 
-    # Wheel odometry — vx only.
+    # Wheel odometry — vx + vyaw (encoder yaw, BNO085 unavailable via I2C).
     odom0: /odom
     odom0_config: [false, false, false,
                    false, false, false,
                    true,  false, false,
-                   false, false, false,
+                   false, false, true,
                    false, false, false]
     odom0_differential: false
     odom0_relative: false
     odom0_queue_size: 5
     odom0_nodelay: true
 
-    # IMU — yaw RATE only (gyro.z).
-    # imu0_queue_size: 2 (ned fra 10) — forhindrer at akkumulerte samples
-    # integreres samlet etter I2C-dropout (gir yaw-sprang).
-    # imu0_twist_rejection_threshold: outlier-avvisning via Mahalanobis-test
-    # som fanger korrupte BNO085-pakker (error 123/255/0x7b).
-    imu0: /imu/data
-    imu0_config: [false, false, false,
-                  false, false, true,
-                  false, false, false,
-                  false, false, false,
-                  false, false, false]
-    imu0_differential: false
-    imu0_relative: true
-    imu0_remove_gravitational_acceleration: true
-    imu0_queue_size: 2
-    imu0_nodelay: true
-    imu0_twist_rejection_threshold: 0.8
+    # IMU disabled — BNO085 I2C blocked permanently on Pi4 sw-I2C.
+    # Re-enable when hardware is switched to SPI or different IMU.
+    # imu0: /imu/data
+    # imu0_config: [...]
 
     # Process noise — 15x15 diagonalmatrise.
     # Lave verdier for yaw (indeks 5,5 = 0.015) og vyaw (11,11 = 0.005)
