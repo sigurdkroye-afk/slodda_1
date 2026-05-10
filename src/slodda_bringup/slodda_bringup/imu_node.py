@@ -12,6 +12,7 @@ Requires hardware I2C enabled in /boot/firmware/config.txt:
 Hardware I2C (BCM2711 BSC) handles BNO085 SHTP clock-stretching correctly.
 Software I2C (i2c-gpio) cannot — it permanently blocks the bus under CPU load.
 """
+import time
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
@@ -55,12 +56,22 @@ class ImuNode(Node):
                 'adafruit_bno08x not installed — '
                 'pip install adafruit-circuitpython-bno08x adafruit-blinka')
         else:
-            i2c = busio.I2C(board.SCL, board.SDA, frequency=400_000)
-            self._bno = BNO08X_I2C(
-                i2c, address=self.get_parameter('i2c_address').value)
-            self._bno.enable_feature(BNO_REPORT_GAME_ROTATION_VECTOR)
-            self._bno.enable_feature(BNO_REPORT_GYROSCOPE)
-            self._bno.enable_feature(BNO_REPORT_LINEAR_ACCELERATION)
+            try:
+                i2c = busio.I2C(board.SCL, board.SDA, frequency=400_000)
+                self._bno = BNO08X_I2C(
+                    i2c, address=self.get_parameter('i2c_address').value)
+                time.sleep(0.5)
+                for feature in (BNO_REPORT_GAME_ROTATION_VECTOR,
+                                BNO_REPORT_GYROSCOPE,
+                                BNO_REPORT_LINEAR_ACCELERATION):
+                    try:
+                        self._bno.enable_feature(feature)
+                    except Exception:
+                        time.sleep(0.2)
+                        self._bno.enable_feature(feature)
+            except Exception as e:
+                self._bno = None
+                self.get_logger().error(f'BNO085 init failed: {e}')
 
         hz = self.get_parameter('publish_hz').value
         self.create_timer(1.0 / hz, self._tick)

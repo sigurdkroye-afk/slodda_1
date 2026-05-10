@@ -25,18 +25,8 @@ ekf_filter_node:
     odom0_queue_size: 5
     odom0_nodelay: true
 
-    # IMU — BNO085 over hardware I2C (BCM2711 BSC handles SHTP clock-stretching).
-    imu0: /imu/data
-    imu0_config: [false, false, false,
-                  false, false, true,
-                  false, false, false,
-                  false, false, true,
-                  false, false, false]
-    imu0_differential: false
-    imu0_relative: true
-    imu0_remove_gravity_acceleration: true
-    imu0_queue_size: 10
-    imu0_nodelay: true
+    # IMU disabled — BNO085 SHTP enable_feature feiler på Pi4 HW I2C.
+    # TODO: bytt til UART-RVC mode eller BNO055 for å få IMU yaw.
 
     # Process noise — 15x15 diagonalmatrise.
     # Lave verdier for yaw (indeks 5,5 = 0.015) og vyaw (11,11 = 0.005)
