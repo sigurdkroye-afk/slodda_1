@@ -90,7 +90,7 @@ def generate_launch_description():
         parameters=[hw, {
             'wheel_base_m':          0.2316,
             'max_wheel_speed_mps':   0.5,
-            'min_pwm':               18.0,
+            'min_pwm':               22.0,
             'max_pwm':               95.0,
             'velocity_deadband_mps': 0.005,
             'cmd_vel_timeout_sec':   0.5,
