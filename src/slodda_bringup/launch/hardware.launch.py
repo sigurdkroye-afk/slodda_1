@@ -58,6 +58,8 @@ def generate_launch_description():
         executable='ldlidar_stl_ros2_node',
         name='LD06',
         output='screen',
+        respawn=True,
+        respawn_delay=3.0,
         parameters=[
             {'product_name': 'LDLiDAR_LD06'},
             {'topic_name': 'scan'},
@@ -73,6 +75,8 @@ def generate_launch_description():
         package='slodda_bringup',
         executable='imu_node',
         output='screen',
+        respawn=True,
+        respawn_delay=5.0,
         parameters=[hw, {'publish_hz': 50.0, 'frame_id': 'imu_link', 'i2c_address': 0x28}]
     )
 
