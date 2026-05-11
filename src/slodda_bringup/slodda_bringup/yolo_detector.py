@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from vision_msgs.msg import Detection2DArray, Detection2D, ObjectHypothesisWithPose
 from cv_bridge import CvBridge
@@ -15,7 +16,7 @@ class YoloDetector(Node):
         self.last_inference_time = self.get_clock().now()
         self.last_result = None
 
-        self.create_subscription(Image, '/camera/image_raw', self.image_cb, 10)
+        self.create_subscription(Image, '/camera/image_raw', self.image_cb, qos_profile_sensor_data)
         self.det_pub = self.create_publisher(Detection2DArray, '/yolo/detections', 10)
         self.img_pub = self.create_publisher(Image, '/yolo/image', 10)
 
