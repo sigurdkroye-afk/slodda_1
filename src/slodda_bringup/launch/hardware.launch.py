@@ -77,7 +77,7 @@ def generate_launch_description():
         output='screen',
         respawn=True,
         respawn_delay=5.0,
-        parameters=[hw, {'publish_hz': 50.0, 'frame_id': 'imu_link', 'i2c_address': 0x28}]
+        parameters=[hw, {'publish_hz': 10.0, 'frame_id': 'imu_link', 'i2c_address': 0x28}]
     )
 
     arm_controller = Node(

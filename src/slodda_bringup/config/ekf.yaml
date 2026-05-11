@@ -1,7 +1,7 @@
 ekf_filter_node:
   ros__parameters:
     frequency: 5.0
-    sensor_timeout: 0.5
+    sensor_timeout: 0.2
     two_d_mode: true
     transform_timeout: 0.3
     publish_tf: true
@@ -35,7 +35,7 @@ ekf_filter_node:
     imu0_differential: false
     imu0_relative: false
     imu0_remove_gravity_acceleration: true
-    imu0_queue_size: 10
+    imu0_queue_size: 2
     imu0_nodelay: true
 
     # Process noise — 15x15 diagonalmatrise.
