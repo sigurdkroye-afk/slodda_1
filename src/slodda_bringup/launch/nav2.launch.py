@@ -157,6 +157,26 @@ def generate_launch_description():
         output='screen'
     )
 
+    camera_panel = TimerAction(
+        period=35.0,
+        actions=[
+            Node(
+                package='slodda_bringup',
+                executable='yolo_detector',
+                name='yolo_detector',
+                output='screen',
+                parameters=[{'use_sim_time': True}],
+            ),
+            Node(
+                package='slodda_bringup',
+                executable='camera_control_panel',
+                name='camera_control_panel',
+                output='screen',
+                parameters=[{'use_sim_time': True}],
+            ),
+        ]
+    )
+
     return LaunchDescription([
         gazebo,
         localization_nodes,
@@ -164,6 +184,7 @@ def generate_launch_description():
         navigation_nodes,
         lifecycle_navigation,
         rviz,
+        camera_panel,
         # TimerAction(
         #     period=28.0,
         #     actions=[
