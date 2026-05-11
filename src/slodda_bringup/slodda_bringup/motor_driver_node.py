@@ -97,7 +97,9 @@ class MotorDriverNode(Node):
         self._running    = threading.Event()
         self._running.set()
 
-        self._target_left  = 0.0  # m/s target set by cmd_vel
+        self._cmd_left     = 0.0  # m/s commanded by cmd_vel
+        self._cmd_right    = 0.0
+        self._target_left  = 0.0  # m/s ramped target fed to PID
         self._target_right = 0.0
         self._pid_left     = _WheelPID(PID_KP, PID_KI, PID_KD)
         self._pid_right    = _WheelPID(PID_KP, PID_KI, PID_KD)
@@ -132,6 +134,7 @@ class MotorDriverNode(Node):
         self.declare_parameter('pid_ki',                PID_KI)
         self.declare_parameter('pid_kd',                PID_KD)
         self.declare_parameter('left_trim',             1.0)  # scale left target; <1.0 slows left
+        self.declare_parameter('max_accel_mps2',        0.2)  # m/s² ramp limit; 0 = disabled
 
     def _setup_pins(self):
         for pin in [LEFT_DIR_PIN_A, LEFT_DIR_PIN_B,
@@ -157,8 +160,8 @@ class MotorDriverNode(Node):
         self.last_cmd_time = self.get_clock().now()
         wb   = self.get_parameter('wheel_base_m').value
         trim = self.get_parameter('left_trim').value
-        self._target_left  = (msg.linear.x - msg.angular.z * wb / 2.0) * trim
-        self._target_right =  msg.linear.x + msg.angular.z * wb / 2.0
+        self._cmd_left  = (msg.linear.x - msg.angular.z * wb / 2.0) * trim
+        self._cmd_right =  msg.linear.x + msg.angular.z * wb / 2.0
 
     # ── PID control loop ───────────────────────────────────────────────────────
 
@@ -168,6 +171,19 @@ class MotorDriverNode(Node):
         self._pid_last_time = now
         if dt <= 0.0:
             return
+
+        # Acceleration ramp: limit how fast target velocity can change
+        max_accel = self.get_parameter('max_accel_mps2').value
+        if max_accel > 0.0:
+            max_delta = max_accel * dt
+            for attr_t, attr_c in (('_target_left', '_cmd_left'), ('_target_right', '_cmd_right')):
+                t = getattr(self, attr_t)
+                c = getattr(self, attr_c)
+                delta = _clamp(c - t, -max_delta, max_delta)
+                setattr(self, attr_t, t + delta)
+        else:
+            self._target_left  = self._cmd_left
+            self._target_right = self._cmd_right
 
         with self._tick_lock:
             cur_left  = self.left_ticks

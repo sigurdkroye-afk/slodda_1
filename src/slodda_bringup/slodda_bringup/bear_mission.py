@@ -80,7 +80,7 @@ class BearMission(Node):
         self.declare_parameter('max_lin_servo', 0.05)
         self.declare_parameter('max_ang_servo', 0.5)
         self.declare_parameter('heading_tolerance', 0.10)
-        self.declare_parameter('lost_timeout_s', 1.0)
+        self.declare_parameter('lost_timeout_s', 15.0)
         self.declare_parameter('grab_timeout_s', 30.0)
 
         # ── Path replay params ───────────────────────────────────────────────
@@ -365,11 +365,11 @@ class BearMission(Node):
             self._set_state(self.VISUAL_SERVO)
             return
 
-        if elapsed > 10.0:
+        if elapsed > 15.0:
             if self._verify_future is None:
                 self.get_logger().error('/arm/search ikke tilgjengelig — avbryter.')
             else:
-                self.get_logger().error('/arm/search timeout — ingen DONE:2 etter 10s.')
+                self.get_logger().error('/arm/search timeout — ingen DONE:2 etter 15s.')
             self._finish('FAILED_VERIFY_TIMEOUT')
 
     # ── VISUAL_SERVO ───────────────────────────────────────────────────────────

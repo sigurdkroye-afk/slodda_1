@@ -95,6 +95,7 @@ def generate_launch_description():
             'velocity_deadband_mps': 0.005,
             'cmd_vel_timeout_sec':   0.5,
             'left_trim':             1.0,
+            'max_accel_mps2':        0.2,
         }]
     )
 
