@@ -50,13 +50,14 @@ class OdometryNode(Node):
         self._x = self._y = self._theta = 0.0
         self._prev_left = self._prev_right = None
         self._last_time = self.get_clock().now()
+        self._last_v     = 0.0
+        self._last_omega = 0.0
+        self._last_tick_time = None
 
         self._odom_pub = self.create_publisher(Odometry, '/odom', 10)
         self._tf_bcast = TransformBroadcaster(self)
         self.create_subscription(
             Int32MultiArray, '/encoder_ticks', self._tick_cb, 10)
-        # Publish at 10 Hz even without encoder ticks so EKF and bear_mission
-        # always have a valid /odom (zero velocity when robot is stationary).
         self.create_timer(0.1, self._timer_cb)
         self.get_logger().info('OdometryNode ready.')
 
@@ -95,7 +96,10 @@ class OdometryNode(Node):
         self._y     += dist * math.sin(self._theta + dtheta / 2.0)
         self._theta += dtheta
 
-        self._publish(now, v=dist / dt, omega=dtheta / dt)
+        self._last_v     = dist / dt
+        self._last_omega = dtheta / dt
+        self._last_tick_time = now
+        self._publish(now, v=self._last_v, omega=self._last_omega)
 
     def _publish(self, stamp, v: float, omega: float):
         q = _yaw_to_quat(self._theta)
@@ -131,7 +135,14 @@ class OdometryNode(Node):
 
 
     def _timer_cb(self):
-        self._publish(self.get_clock().now(), v=0.0, omega=0.0)
+        now = self.get_clock().now()
+        # Decay velocity to zero if no encoder ticks for >200ms (robot stopped)
+        if self._last_tick_time is not None:
+            age = (now - self._last_tick_time).nanoseconds / 1e9
+            if age > 0.2:
+                self._last_v = 0.0
+                self._last_omega = 0.0
+        self._publish(now, v=self._last_v, omega=self._last_omega)
 
 
 def _yaw_to_quat(yaw: float):
