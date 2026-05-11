@@ -38,7 +38,7 @@ _STATE_COLORS = {
     'CANCELING':   '#1a6bb5',
     'TRACK_BEAR':  '#c47a00',
     'AT_BEAR':     '#2d8a2d',
-    'RETURN_HOME': '#8a2d8a',
+    'RETURN_HOME': "#862c86",
 }
 
 
