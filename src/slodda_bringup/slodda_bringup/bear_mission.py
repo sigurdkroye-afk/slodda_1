@@ -176,6 +176,18 @@ class BearMission(Node):
             self._path_buffer.clear()
             self._caching_path = True
             self._call_arm_async('drive')   # deploy arm to drive pos (fire-and-forget)
+
+            if self._bear_recently_seen(window_s=3.0):
+                self.get_logger().info(
+                    'Bamse allerede synlig ved start — hopper over Nav2, går rett til VERIFY_BEAR.'
+                )
+                self._caching_path     = False
+                self._last_arm_status  = ''
+                self._verify_t0        = self.get_clock().now()
+                self._verify_future    = self._call_arm_async('search')
+                self._set_state(self.VERIFY_BEAR)
+                return
+
             self._set_state(self.NAVIGATE)
             self._send_nav_goal()
 
@@ -232,8 +244,13 @@ class BearMission(Node):
     # NAVIGATE
 
     def _tick_navigate(self):
-        if self._yolo_verified():
-            self.get_logger().info('Bamse verifisert under NAVIGATE — avbryter Nav2!')
+        high_conf = self._yolo_verified()
+        low_conf  = self._bear_recently_seen(window_s=1.0)
+        if high_conf or low_conf:
+            reason = 'high-conf' if high_conf else 'low-conf'
+            self.get_logger().info(
+                f'Bamse sett under NAVIGATE ({reason}) — avbryter Nav2!'
+            )
             self._cancel_nav_goal()
             self._stop()
             self._cancel_ticks = 0
@@ -279,9 +296,23 @@ class BearMission(Node):
             self._caching_path = False
             self._set_state(self.SEARCH)
             self.search_start = self.get_clock().now()
-        else:
-            self.get_logger().warn(f'Navigasjon feilet, status={status}.')
-            self._finish('FAILED_NAV')
+            return
+
+        if self._bear_recently_seen(window_s=3.0):
+            self.get_logger().warn(
+                f'Nav2 feilet (status={status}), men bamse nylig sett — '
+                f'går til VERIFY_BEAR.'
+            )
+            self._stop()
+            self._caching_path    = False
+            self._last_arm_status = ''
+            self._verify_t0       = self.get_clock().now()
+            self._verify_future   = self._call_arm_async('search')
+            self._set_state(self.VERIFY_BEAR)
+            return
+
+        self.get_logger().warn(f'Navigasjon feilet, status={status}.')
+        self._finish('FAILED_NAV')
 
     # CANCELING
 
@@ -667,6 +698,12 @@ class BearMission(Node):
         now    = self.get_clock().now()
         last_n = list(self._yolo_recent)[-self._yolo_verify_count:]
         return (now - last_n[0][0]).nanoseconds * 1e-9 < 1.5
+
+    def _bear_recently_seen(self, window_s: float = 3.0) -> bool:
+        """True hvis siste class-77 deteksjon (conf>=0.15) er nyere enn window_s."""
+        if self.last_det_time is None:
+            return False
+        return (self.get_clock().now() - self.last_det_time).nanoseconds * 1e-9 < window_s
 
     def _yaw_from_quat(self, q) -> float:
         siny_cosp = 2.0 * (q.w * q.z + q.x * q.y)
