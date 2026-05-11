@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+import os
+import queue
+import threading
+import time
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -13,31 +17,49 @@ class YoloDetector(Node):
         super().__init__('yolo_detector')
         self.bridge = CvBridge()
         self.model = YOLO('yolov8n.pt')
-        self.last_inference_time = self.get_clock().now()
-        self.last_result = None
+
+        # Non-blocking inference: frames queued here, worker thread processes them.
+        # maxsize=1 drops stale frames so YOLO always sees the freshest image.
+        self._frame_queue = queue.Queue(maxsize=1)
+        self._last_result = None
+        self._last_header = None
 
         self.create_subscription(Image, '/camera/image_raw', self.image_cb, qos_profile_sensor_data)
         self.det_pub = self.create_publisher(Detection2DArray, '/yolo/detections', 10)
         self.img_pub = self.create_publisher(Image, '/yolo/image', 10)
 
+        threading.Thread(target=self._infer_loop, daemon=True).start()
         self.get_logger().info('YoloDetector klar — venter på /camera/image_raw')
 
     def image_cb(self, msg: Image):
+        """Fast callback: convert and queue frame, never block."""
         try:
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         except Exception as e:
             self.get_logger().warn(f'cv_bridge: {e}')
             return
+        try:
+            self._frame_queue.put_nowait((frame, msg.header))
+        except queue.Full:
+            pass  # drop stale frame — worker is still busy with previous
 
-        now = self.get_clock().now()
-        if (now - self.last_inference_time).nanoseconds >= 200_000_000:  # 5 Hz
-            self.last_inference_time = now
+    def _infer_loop(self):
+        """Background worker: YOLO inference without blocking the ROS2 executor."""
+        os.nice(10)  # lower priority so EKF/Nav2 preempt during inference
+        while True:
+            try:
+                frame, header = self._frame_queue.get(timeout=1.0)
+            except queue.Empty:
+                continue
+
             results = self.model.predict(frame, classes=[77], conf=0.15, verbose=False, device='cpu')
-            self.last_result = results[0]
+            result = results[0]
+            self._last_result = result
+            self._last_header = header
 
             arr = Detection2DArray()
-            arr.header = msg.header
-            for box in self.last_result.boxes:
+            arr.header = header
+            for box in result.boxes:
                 x1, y1, x2, y2 = box.xyxy[0].tolist()
                 det = Detection2D()
                 det.bbox.center.position.x = (x1 + x2) / 2.0
@@ -49,16 +71,20 @@ class YoloDetector(Node):
                 hyp.hypothesis.score = float(box.conf[0])
                 det.results.append(hyp)
                 arr.detections.append(det)
+
             self.det_pub.publish(arr)
 
             if arr.detections:
                 self.get_logger().info(f'Detected {len(arr.detections)} teddy bear(s)')
 
-        annotated = self.last_result.plot() if self.last_result is not None else frame
-        try:
-            self.img_pub.publish(self.bridge.cv2_to_imgmsg(annotated, encoding='bgr8'))
-        except Exception as e:
-            self.get_logger().warn(f'annotert bilde: {e}')
+            try:
+                annotated = result.plot()
+                self.img_pub.publish(self.bridge.cv2_to_imgmsg(annotated, encoding='bgr8'))
+            except Exception:
+                pass
+
+            # Brief cooldown so Pi4 can catch up on EKF/Nav2 between inferences
+            time.sleep(2.0)
 
 
 def main(args=None):

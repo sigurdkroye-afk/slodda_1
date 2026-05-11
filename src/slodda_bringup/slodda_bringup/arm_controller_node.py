@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import re
 import threading
 import rclpy
 from rclpy.node import Node
@@ -68,18 +69,21 @@ class ArmControllerNode(Node):
                 msg.data = line
                 self._status_pub.publish(msg)
 
-                if line.startswith('DONE:'):
-                    try:
-                        pos = int(line.split(':')[1])
-                        if pos == 2:
-                            self._grabbed.clear()
-                        if pos in self._done:
-                            self._done[pos].set()
-                    except ValueError:
-                        pass
-                elif line == 'GRABBED':
+                # Robust parsing: tolererer UART-garbling (f.eks. "DONE2" for "DONE:2")
+                m = re.search(r'DONE[^0-9]*(\d)', line)
+                if m:
+                    pos = int(m.group(1))
+                    canonical = f'DONE:{pos}'
+                    msg.data = canonical
+                    if pos == 2:
+                        self._grabbed.clear()
+                    if pos in self._done:
+                        self._done[pos].set()
+                elif 'GRABBED' in line:
+                    msg.data = 'GRABBED'
                     self._grabbed.set()
-                elif line == 'STOPPED':
+                elif 'STOPPED' in line:
+                    msg.data = 'STOPPED'
                     self._stopped.set()
             except Exception:
                 pass
