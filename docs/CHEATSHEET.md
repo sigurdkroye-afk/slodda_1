@@ -17,7 +17,7 @@ source install/setup.bash
 ## Launch — Pi
 
 ```bash
-ros2 launch slodda_bringup hardware.launch.py          # full stack (~30s oppstart)
+ros2 launch slodda_bringup hardware.launch.py          # full stack (~35s oppstart)
 ```
 
 ## Laptop — RViz
@@ -42,6 +42,26 @@ ros2 action send_goal /backup nav2_msgs/action/BackUp \
   "{target: {x: 0.3, y: 0.0, z: 0.0}, speed: 0.1, time_allowance: {sec: 10}}"
 ```
 
+## Arm-kontroll
+
+Posisjoner: **0=OPEN** | **1=DRIVE** | **2=SEARCH (IR aktiv)** | **3=GRAB**
+
+```bash
+ros2 service call /arm/open   std_srvs/srv/Trigger {}   # pos 0 — hvile
+ros2 service call /arm/drive  std_srvs/srv/Trigger {}   # pos 1 — kjøring
+ros2 service call /arm/search std_srvs/srv/Trigger {}   # pos 2 — søk + IR auto-grip
+ros2 service call /arm/grab   std_srvs/srv/Trigger {}   # pos 3 — grep
+ros2 service call /arm/stop   std_srvs/srv/Trigger {}   # nødstopp
+
+ros2 topic echo /arm/status                              # DONE:X / GRABBED / STOPPED
+```
+
+Manuell kalibrering (krever arm_controller_node kjørende):
+```bash
+python3 ~/slodda_1/src/slodda_bringup/scripts/arm_manual_control.py
+# t/g/y/h/u/j = servo-steg | z/x/c/v = lagre pos 0/1/2/3 | q = nødstopp
+```
+
 ## Teleop
 
 ```bash
@@ -59,7 +79,7 @@ ros2 topic hz /imu/data                    # ~50 Hz
 ros2 topic hz /odom                        # ~10 Hz
 ros2 topic hz /odometry/filtered           # ~12 Hz
 ros2 topic echo /odometry/filtered --once
-ros2 topic info -v /cmd_vel                # sjekk type (Twist, ikke TwistStamped)
+ros2 topic echo /arm/status                # arm-feedback fra ESP32
 ```
 
 ## TF / frames
@@ -75,6 +95,7 @@ ros2 run tf2_tools view_frames
 ```bash
 ros2 node list
 ros2 node info /ekf_filter_node
+ros2 node info /arm_controller
 ros2 lifecycle nodes
 ros2 lifecycle get /controller_server
 ```
@@ -84,7 +105,10 @@ ros2 lifecycle get /controller_server
 ```bash
 i2cdetect -y 1                             # skal vise 0x28 (BNO055)
 ls /dev/ttyAMA3                            # lidar-port
-cat /boot/firmware/config.txt | grep -E "uart3|i2c_arm"
+ls /dev/ttyS0                              # arm UART til ESP32
+cat /proc/cmdline | grep serial            # skal IKKE inneholde console=serial0
+systemctl is-enabled serial-getty@ttyS0    # skal vise disabled
+cat /boot/firmware/config.txt | grep -E "uart3|i2c_arm|enable_uart"
 ```
 
 ## SSH / deploy
@@ -92,6 +116,7 @@ cat /boot/firmware/config.txt | grep -E "uart3|i2c_arm"
 ```bash
 ssh slodda1@sloddapi
 cd ~/slodda_1 && git pull && colcon build --packages-select slodda_bringup
+source install/setup.bash
 ```
 
 ## Diagnostikk
@@ -105,7 +130,7 @@ pkill -f ros2                              # drep alle ROS2-prosesser
 ## Bag-recording
 
 ```bash
-ros2 bag record /scan /odom /odometry/filtered /imu/data /cmd_vel /tf /tf_static
+ros2 bag record /scan /odom /odometry/filtered /imu/data /cmd_vel /arm/status /tf /tf_static
 ros2 bag play <bag_dir>/
 ```
 
@@ -122,6 +147,9 @@ git checkout main && git merge dev && git push
 
 | Problem | Fiks |
 |---|---|
+| Servoer gjør random shit ved oppstart | `console=serial0` i cmdline.txt — kjør: `sudo sed -i 's/console=serial0,115200 //' /boot/firmware/cmdline.txt` + reboot |
+| `/dev/ttyS0: Permission denied` | `sudo systemctl disable --now serial-getty@ttyS0` + `sudo chmod 666 /dev/ttyS0` |
+| Arm TIMEOUT | Feil pins koblet til ESP32 — verifiser GPIO13 (RX) og GPIO17 (TX) |
 | Launch-endringer virker ikke etter pull | `colcon build --packages-select slodda_bringup` |
 | Topics ikke synlig fra laptop | `export ROS_DOMAIN_ID=42` på begge maskiner |
 | BNO055 ikke funnet | `i2cdetect -y 1` → sjekk `0x28`; verifiser `dtparam=i2c_arm=on` i config.txt |
