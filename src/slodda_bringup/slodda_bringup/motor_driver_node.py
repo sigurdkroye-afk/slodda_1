@@ -17,32 +17,32 @@ from geometry_msgs.msg import Twist
 from std_msgs.msg import Int32MultiArray
 from .gpio_backend import LgpioBackend
 
-# ── Robot geometry ─────────────────────────────────────────────────────────────
+# Robot geometry
 WHEEL_BASE_M          = 0.2316  # m  effective turning wheel base (calibrated, < physical 0.256)
 WHEEL_RADIUS_M        = 0.01021 # m  drive sprocket radius (calibrated)
 ENCODER_TICKS_PER_REV = 663     # GB37Y3530: 11PPR * 2 edges * 30.15 ratio ≈ 663
 METRES_PER_TICK       = 2.0 * math.pi * WHEEL_RADIUS_M / ENCODER_TICKS_PER_REV
 
-# ── PWM ────────────────────────────────────────────────────────────────────────
+# PWM
 PWM_FREQUENCY_HZ      = 1000    # Hz
 MIN_PWM               = 18.0    # %  — overcomes static friction; tune on hardware
 MAX_PWM               = 95.0    # %
 MAX_WHEEL_SPEED_MPS   = 0.5     # m/s at 100% duty (full-scale reference)
 VELOCITY_DEADBAND_MPS = 0.01    # m/s — below this → PWM=0
 
-# ── PID — start tuning with Ki=Kd=0 until Kp response looks stable ────────────
+# PID — start tuning with Ki=Kd=0 until Kp response looks stable
 PID_KP             = 30.0   # %PWM per (m/s error)
 PID_KI             = 5.0    # %PWM per (m/s · s)
 PID_KD             = 0.5    # %PWM per (m/s / s)
 PID_MAX_CORRECTION = 20.0   # % — bounds correction so feedforward dominates
 
-# ── Loop rates ─────────────────────────────────────────────────────────────────
+# Loop rates
 ENCODER_PUBLISH_HZ    = 20      # Hz
 PID_HZ                = 20      # Hz — matches encoder publish rate
 WATCHDOG_HZ           = 10      # Hz
 CMD_VEL_TIMEOUT_SEC   = 0.5     # s  — stop if no /cmd_vel
 
-# ── GPIO pins (BCM numbering) — DFR0601, Motor 1 = left, Motor 2 = right ──────
+# GPIO pins (BCM numbering) — DFR0601, Motor 1 = left, Motor 2 = right
 LEFT_PWM_PIN    = 18   # P1
 LEFT_DIR_PIN_A  = 23   # A1
 LEFT_DIR_PIN_B  = 24   # B1
@@ -154,7 +154,7 @@ class MotorDriverNode(Node):
         if RIGHT_ENC_A_PIN is not None:
             self.gpio.attach_interrupt(RIGHT_ENC_A_PIN, 'both', self._on_right_tick)
 
-    # ── cmd_vel handler — stores targets only, PID loop drives PWM ────────────
+    # cmd_vel handler — stores targets only, PID loop drives PWM
 
     def _cmd_cb(self, msg: Twist):
         self.last_cmd_time = self.get_clock().now()
@@ -163,7 +163,7 @@ class MotorDriverNode(Node):
         self._cmd_left  = (msg.linear.x - msg.angular.z * wb / 2.0) * trim
         self._cmd_right =  msg.linear.x + msg.angular.z * wb / 2.0
 
-    # ── PID control loop ───────────────────────────────────────────────────────
+    # PID control loop
 
     def _pid_step(self):
         now = self.get_clock().now()
@@ -206,7 +206,7 @@ class MotorDriverNode(Node):
             corr = pid.step(target - actual, dt, -PID_MAX_CORRECTION, PID_MAX_CORRECTION)
             self._apply_signed_duty(side, ff + corr)
 
-    # ── Helpers ────────────────────────────────────────────────────────────────
+    # Helpers
 
     def _vel_to_signed_duty(self, v_mps: float) -> float:
         """Feedforward: velocity → signed PWM duty (negative = reverse)."""
@@ -246,7 +246,7 @@ class MotorDriverNode(Node):
         if pin_b is not None:
             self.gpio.write(pin_b, not forward)
 
-    # ── Encoder interrupts ─────────────────────────────────────────────────────
+    # Encoder interrupts
 
     def _on_left_tick(self, *_):
         if not self._running.is_set():
@@ -269,7 +269,7 @@ class MotorDriverNode(Node):
         msg.data = data
         self.tick_pub.publish(msg)
 
-    # ── Watchdog ───────────────────────────────────────────────────────────────
+    # Watchdog
 
     def _watchdog(self):
         timeout = self.get_parameter('cmd_vel_timeout_sec').value
@@ -282,7 +282,7 @@ class MotorDriverNode(Node):
             self._left_pwm.set_duty(0.0)
             self._right_pwm.set_duty(0.0)
 
-    # ── Shutdown ───────────────────────────────────────────────────────────────
+    # Shutdown
 
     def destroy_node(self):
         self._left_pwm.stop()

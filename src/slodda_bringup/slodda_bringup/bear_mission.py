@@ -12,7 +12,7 @@ from std_srvs.srv import Trigger
 from collections import deque
 import math
 
-# ── ALIGN_AND_APPROACH (beholdt) ────────────────────────────────────────────
+# ALIGN_AND_APPROACH (beholdt)
 KP_ANGULAR              = 0.005   # rad/s per pixel
 MAX_ANGULAR_VEL         = 0.6     # rad/s
 PIXEL_ALIGN_THRESHOLD   = 20      # px — alignment complete
@@ -42,7 +42,7 @@ def clamp(v, lo, hi):
 
 
 class BearMission(Node):
-    # ── State constants ──────────────────────────────────────────────────────
+    # State constants
     IDLE               = 'IDLE'
     NAVIGATE           = 'NAVIGATE_TO_GOAL'
     CANCELING          = 'CANCELING'
@@ -63,7 +63,7 @@ class BearMission(Node):
     def __init__(self):
         super().__init__('bear_mission')
 
-        # ── Original params ──────────────────────────────────────────────────
+        # Original params
         self.declare_parameter('goal_x', 1.0)
         self.declare_parameter('goal_y', 0.0)
         self.declare_parameter('search_timeout', 30.0)
@@ -74,7 +74,7 @@ class BearMission(Node):
         self.declare_parameter('image_height', 480)
         self.declare_parameter('use_align_and_approach', True)
 
-        # ── Visual servo params ──────────────────────────────────────────────
+        # Visual servo params
         self.declare_parameter('target_cx_offset_norm', -0.15)
         self.declare_parameter('k_p_yaw', 1.5)
         self.declare_parameter('max_lin_servo', 0.05)
@@ -83,12 +83,12 @@ class BearMission(Node):
         self.declare_parameter('lost_timeout_s', 15.0)
         self.declare_parameter('grab_timeout_s', 30.0)
 
-        # ── Path replay params ───────────────────────────────────────────────
+        # Path replay params
         self.declare_parameter('replay_lin_speed', 0.10)
         self.declare_parameter('replay_xy_tol', 0.15)
         self.declare_parameter('replay_yaw_tol', 0.25)
 
-        # ── Original state attrs ─────────────────────────────────────────────
+        # Original state attrs
         self.state              = self.IDLE
         self.last_detection     = None
         self.last_det_time      = None
@@ -111,7 +111,7 @@ class BearMission(Node):
 
         self.image_width = self.get_parameter('image_width').value
 
-        # ── Arm service clients ──────────────────────────────────────────────
+        # Arm service clients
         self._arm_clients = {
             'open':   self.create_client(Trigger, '/arm/open'),
             'drive':  self.create_client(Trigger, '/arm/drive'),
@@ -122,19 +122,19 @@ class BearMission(Node):
         self._last_arm_status = ''
         self._arm_grabbed     = False
 
-        # ── Odom path-buffer ─────────────────────────────────────────────────
+        # Odom path-buffer
         self._latest_odom   = None
         self._path_buffer   = deque(maxlen=500)
         self._caching_path  = False
         self._start_pose    = None          # (x, y, yaw) captured at mission start
 
-        # ── YOLO verification ────────────────────────────────────────────────
+        # YOLO verification
         # Each entry: (ROS timestamp, confidence, Detection2D.bbox)
         self._yolo_recent       = deque(maxlen=5)
         self._yolo_verify_count = 1
         self._yolo_verify_conf  = 0.40
 
-        # ── Per-state timers / futures ───────────────────────────────────────
+        # Per-state timers / futures
         self._verify_t0             = None
         self._verify_future         = None
         self._servo_t0              = None
@@ -145,17 +145,17 @@ class BearMission(Node):
         self._release_t0            = None
         self._release_future        = None
 
-        # ── Nav2 action client ───────────────────────────────────────────────
+        # Nav2 action client
         self._nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
 
-        # ── Subscriptions ────────────────────────────────────────────────────
+        # Subscriptions
         self.create_subscription(Bool,             '/bear_mission/start', self.start_cb,       10)
         self.create_subscription(Detection2DArray, '/yolo/detections',    self.det_cb,         10)
         self.create_subscription(LaserScan,        '/scan',               self._scan_cb,       10)
         self.create_subscription(String,           '/arm/status',         self._on_arm_status, 10)
         self.create_subscription(Odometry,         '/odom',               self._on_odom,       10)
 
-        # ── Publishers ───────────────────────────────────────────────────────
+        # Publishers
         self.cmd_pub    = self.create_publisher(Twist,  '/cmd_vel',             10)
         self.status_pub = self.create_publisher(String, '/bear_mission/status', 10)
         self.track_pub  = self.create_publisher(Bool,   '/track/enable',        10)
@@ -163,7 +163,7 @@ class BearMission(Node):
         self.create_timer(0.1, self.tick)
         self.get_logger().info('BearMission klar. Publiser /bear_mission/start=true for å starte.')
 
-    # ── Callbacks ─────────────────────────────────────────────────────────────
+    # Callbacks
 
     def start_cb(self, msg: Bool):
         if msg.data and self.state == self.IDLE:
@@ -213,7 +213,7 @@ class BearMission(Node):
                     self._pose_dist(self._path_buffer[-1], pos) >= 0.05):
                 self._path_buffer.append(pos)
 
-    # ── Tick dispatcher ────────────────────────────────────────────────────────
+    # Tick dispatcher
 
     def tick(self):
         self.status_pub.publish(String(data=self.state))
@@ -229,7 +229,7 @@ class BearMission(Node):
         elif self.state == self.RETURN_HOME:        self._tick_return_home()
         elif self.state == self.FINAL_RELEASE:      self._tick_final_release()
 
-    # ── NAVIGATE ───────────────────────────────────────────────────────────────
+    # NAVIGATE
 
     def _tick_navigate(self):
         if self._yolo_verified():
@@ -283,7 +283,7 @@ class BearMission(Node):
             self.get_logger().warn(f'Navigasjon feilet, status={status}.')
             self._finish('FAILED_NAV')
 
-    # ── CANCELING ──────────────────────────────────────────────────────────────
+    # CANCELING
 
     def _tick_canceling(self):
         self._stop()
@@ -295,7 +295,7 @@ class BearMission(Node):
             self._verify_future = self._call_arm_async('search')
             self._set_state(self.VERIFY_BEAR)
 
-    # ── SEARCH ─────────────────────────────────────────────────────────────────
+    # SEARCH
 
     def _tick_search(self):
         timeout = self.get_parameter('search_timeout').value
@@ -318,7 +318,7 @@ class BearMission(Node):
         twist.angular.z = 0.3
         self.cmd_pub.publish(twist)
 
-    # ── APPROACH (original, for backward compat) ───────────────────────────────
+    # APPROACH (original, for backward compat)
 
     def _tick_approach(self):
         W         = self.get_parameter('image_width').value
@@ -348,7 +348,7 @@ class BearMission(Node):
         twist.angular.z = -k_ang * (cx - W / 2.0)
         self.cmd_pub.publish(twist)
 
-    # ── VERIFY_BEAR ────────────────────────────────────────────────────────────
+    # VERIFY_BEAR
 
     def _tick_verify_bear(self):
         self._stop()
@@ -372,7 +372,7 @@ class BearMission(Node):
                 self.get_logger().error('/arm/search timeout — ingen DONE:2 etter 15s.')
             self._finish('FAILED_VERIFY_TIMEOUT')
 
-    # ── VISUAL_SERVO ───────────────────────────────────────────────────────────
+    # VISUAL_SERVO
 
     def _tick_visual_servo(self):
         now = self.get_clock().now()
@@ -430,7 +430,7 @@ class BearMission(Node):
             self.search_start = self.get_clock().now()
             self._set_state(self.SEARCH)
 
-    # ── RETURN_HOME ────────────────────────────────────────────────────────────
+    # RETURN_HOME
 
     def _enter_return_home(self):
         self.get_logger().info('Starter retur hjem via path replay (rygging).')
@@ -474,7 +474,7 @@ class BearMission(Node):
         ang_z = clamp(1.5 * yaw_err, -0.5, 0.5)
         self._publish_twist(lin_x, ang_z)
 
-    # ── FINAL_RELEASE ──────────────────────────────────────────────────────────
+    # FINAL_RELEASE
 
     def _enter_final_release(self):
         self.get_logger().info('FINAL_RELEASE: åpner arm og avslutter oppdraget.')
@@ -497,7 +497,7 @@ class BearMission(Node):
             self.get_logger().warn('/arm/open timeout — fullfører uansett.')
             self._finish('SUCCESS')
 
-    # ── Navigation helpers ─────────────────────────────────────────────────────
+    # Navigation helpers
 
     def _cancel_nav_goal(self):
         if self._nav_handle is not None:
@@ -527,7 +527,7 @@ class BearMission(Node):
         self._idle_timer.cancel()
         self._set_state(self.IDLE)
 
-    # ── LiDAR ──────────────────────────────────────────────────────────────────
+    # LiDAR
 
     def _scan_cb(self, msg: LaserScan):
         self.last_scan = msg
@@ -552,7 +552,7 @@ class BearMission(Node):
         self.too_close  = below_min > 0
         self.distance_m = min(valid) if valid else float('inf')
 
-    # ── Detection helpers ──────────────────────────────────────────────────────
+    # Detection helpers
 
     def _pixel_error(self):
         if self.last_detection is None or self.last_det_time is None:
@@ -569,7 +569,7 @@ class BearMission(Node):
         twist.angular.z = angular_z
         self.cmd_pub.publish(twist)
 
-    # ── LOST_TARGET ────────────────────────────────────────────────────────────
+    # LOST_TARGET
 
     def _enter_lost_target(self):
         self.get_logger().warn('Mistet bjørn — LOST_TARGET')
@@ -593,7 +593,7 @@ class BearMission(Node):
             return
         self._publish_twist(0.0, SEARCH_ANGULAR_VEL)
 
-    # ── ALIGN_AND_APPROACH (beholdt, bypassed i ny flyt) ──────────────────────
+    # ALIGN_AND_APPROACH (beholdt, bypassed i ny flyt)
 
     def _aa_rotate(self):
         err, fresh = self._pixel_error()
@@ -650,7 +650,7 @@ class BearMission(Node):
         elif self.aa_phase == 'APPROACH': self._aa_approach()
         elif self.aa_phase == 'COMPLETE': self._aa_complete()
 
-    # ── Helpers ────────────────────────────────────────────────────────────────
+    # Helpers
 
     def _call_arm_async(self, name: str):
         """Non-blocking arm service call. Returns future or None if service not ready."""

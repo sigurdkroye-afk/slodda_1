@@ -88,19 +88,19 @@ class HardwarePanel(QWidget):
         row = QHBoxLayout()
         row.setSpacing(6)
 
-        btn_approve = QPushButton('✓ Approve')
+        btn_approve = QPushButton('Approve')
         btn_approve.setMinimumHeight(40)
         btn_approve.setStyleSheet('background: #2a7a2a; color: white; font-size: 12pt;')
         btn_approve.clicked.connect(self._node.approve)
         row.addWidget(btn_approve)
 
-        btn_home = QPushButton('⟵ Return Home')
+        btn_home = QPushButton('Return Home')
         btn_home.setMinimumHeight(40)
         btn_home.setStyleSheet('background: #4a4a9a; color: white; font-size: 12pt;')
         btn_home.clicked.connect(self._node.return_home)
         row.addWidget(btn_home)
 
-        btn_cancel = QPushButton('■ CANCEL NAV2')
+        btn_cancel = QPushButton('CANCEL NAV2')
         btn_cancel.setMinimumHeight(40)
         btn_cancel.setStyleSheet('background: #a02020; color: white; font-size: 12pt; font-weight: bold;')
         btn_cancel.clicked.connect(self._node.cancel_nav2)
@@ -108,7 +108,7 @@ class HardwarePanel(QWidget):
 
         layout.addLayout(row)
 
-        btn_arm_stop = QPushButton('🛑 ARM STOPP')
+        btn_arm_stop = QPushButton('ARM STOPP')
         btn_arm_stop.setMinimumHeight(50)
         btn_arm_stop.setStyleSheet(
             'background: #cc0000; color: white; font-size: 14pt; font-weight: bold; border: 2px solid #ff4444;'

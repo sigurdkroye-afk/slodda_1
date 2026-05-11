@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Combined YOLO camera view + mission control buttons in a single window.
-Replaces rqt_image_view and the standalone control_panel.
-"""
+"""Combined YOLO camera view + mission control buttons (replaces rqt_image_view + control_panel)."""
 import sys
 import threading
 import cv2
@@ -20,9 +17,9 @@ from PyQt5.QtCore import Qt, pyqtSignal, QObject
 from PyQt5.QtGui import QImage, QPixmap, QFont
 
 BUTTONS = [
-    ('APPROVE',     '✓ Approve',     ['AT_BEAR']),
-    ('RETURN_HOME', '⟵ Return Home', ['NAVIGATE', 'CANCELING', 'TRACK_BEAR', 'AT_BEAR']),
-    ('ABORT',       '✕ Abort',       ['NAVIGATE', 'CANCELING', 'TRACK_BEAR']),
+    ('APPROVE',     'Approve',      ['AT_BEAR']),
+    ('RETURN_HOME', 'Return Home',  ['NAVIGATE', 'CANCELING', 'TRACK_BEAR', 'AT_BEAR']),
+    ('ABORT',       'Abort',        ['NAVIGATE', 'CANCELING', 'TRACK_BEAR']),
 ]
 
 STATE_COLORS = {
@@ -80,19 +77,19 @@ class CameraControlPanel(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(5)
 
-        # ── Camera image ──────────────────────────────────────────────────────
+        # Camera image
         self._img_label = QLabel('Waiting for camera...')
         self._img_label.setAlignment(Qt.AlignCenter)
         self._img_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self._img_label.setStyleSheet('background: #111; color: #555;')
         layout.addWidget(self._img_label, stretch=1)
 
-        # ── Separator ─────────────────────────────────────────────────────────
+        # Separator
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
         layout.addWidget(sep)
 
-        # ── Status label ──────────────────────────────────────────────────────
+        # Status label
         self._status = QLabel('---')
         self._status.setAlignment(Qt.AlignCenter)
         f = QFont('monospace', 10)
@@ -101,7 +98,7 @@ class CameraControlPanel(QWidget):
         self._status.setTextFormat(Qt.RichText)
         layout.addWidget(self._status)
 
-        # ── Buttons ───────────────────────────────────────────────────────────
+        # Buttons
         row = QHBoxLayout()
         row.setSpacing(6)
         self._btns: dict[str, QPushButton] = {}

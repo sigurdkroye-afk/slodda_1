@@ -5,7 +5,7 @@ from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 import time
 
-# --- Terskelverdier ---
+# Terskelverdier
 OBSTACLE_DIST = 0.25   # meter: under denne = hinder detektert
 REVERSE_SPEED = -0.15  # m/s bakover
 TURN_SPEED    =  0.6   # rad/s sving
@@ -17,15 +17,12 @@ class ObstacleAvoider(Node):
     def __init__(self):
         super().__init__("obstacle_avoider")
 
-        # Subscriptions
         self.sub_left   = self.create_subscription(LaserScan, "/ir_front_left",   self.cb_left,   10)
         self.sub_center = self.create_subscription(LaserScan, "/ir_front_center",  self.cb_center, 10)
         self.sub_right  = self.create_subscription(LaserScan, "/ir_front_right",   self.cb_right,  10)
 
-        # Publisher
         self.pub = self.create_publisher(Twist, "/cmd_vel", 10)
 
-        # Sensorverdier
         self.dist_left   = 9.9
         self.dist_center = 9.9
         self.dist_right  = 9.9
@@ -33,13 +30,11 @@ class ObstacleAvoider(Node):
         # Kontroll-loop: 10 Hz
         self.timer = self.create_timer(0.1, self.control_loop)
 
-        # State
         self.state = "FORWARD"
         self.state_start = self.get_clock().now()
 
         self.get_logger().info("ObstacleAvoider startet!")
 
-    # --- Hjelpefunksjon: hent minste avstand fra LaserScan ---
     def min_range(self, msg):
         ranges = [r for r in msg.ranges if msg.range_min < r < msg.range_max]
         return min(ranges) if ranges else 9.9
@@ -62,7 +57,7 @@ class ObstacleAvoider(Node):
         msg.angular.z = angular
         self.pub.publish(msg)
 
-    # --- Hoved state machine ---
+    # Hoved state machine
     def control_loop(self):
         l = self.dist_left
         c = self.dist_center

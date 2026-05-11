@@ -57,7 +57,7 @@ class OdomCalibration(Node):
         else:
             self._run_distance()
 
-    # ── Distanse-kalibrering ──────────────────────────────────────────────────
+    # Distanse-kalibrering
 
     def _run_distance(self):
         speed       = self.get_parameter('drive_speed_mps').value
@@ -142,7 +142,7 @@ class OdomCalibration(Node):
                 print('Ugyldig input.')
         print('\nFerdig.')
 
-    # ── Rotasjonskalibrering ──────────────────────────────────────────────────
+    # Rotasjonskalibrering
 
     def _run_rotation(self):
         target_deg  = self.get_parameter('rotation_angle_deg').value

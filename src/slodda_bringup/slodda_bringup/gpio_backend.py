@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""
-GPIO abstraction layer for motor driver.
-
-Implement a concrete subclass of GpioBackend for your chosen GPIO library
-(e.g. RPi.GPIO, gpiozero, lgpio, pigpio) and swap StubGpioBackend in
-motor_driver_node.py for your implementation.
-"""
+"""GPIO abstraction. Subclass GpioBackend for chosen library (RPi.GPIO/lgpio/pigpio); swap StubGpioBackend in motor_driver_node.py."""
 
 
 class PwmHandle:

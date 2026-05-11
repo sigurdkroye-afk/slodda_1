@@ -1,11 +1,5 @@
 #!/usr/bin/env python3
-"""
-Standalone control panel for bear mission.
-Publishes String commands to /mission/cmd.
-Subscribes to /mission/status to update button states.
-
-Commands: START | APPROVE | RETURN_HOME | ABORT
-"""
+"""Standalone control panel — publishes /mission/cmd, subscribes /mission/status."""
 import sys
 import threading
 import rclpy
@@ -91,10 +85,10 @@ class ControlPanel(QWidget):
 
         self._btns = {}
         defs = [
-            ('START',       '▶  Start Mission'),
-            ('APPROVE',     '✓  Approve at Bear'),
-            ('RETURN_HOME', '⟵  Return Home'),
-            ('ABORT',       '✕  Abort'),
+            ('START',       'Start Mission'),
+            ('APPROVE',     'Approve at Bear'),
+            ('RETURN_HOME', 'Return Home'),
+            ('ABORT',       'Abort'),
         ]
         for cmd, label in defs:
             btn = QPushButton(label)

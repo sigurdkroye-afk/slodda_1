@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
-"""
-Waypoint mission script for Slodda 1.
-Sends a sequence of waypoints through the arena using Nav2 NavigateToPose action.
-"""
+"""Sender en sekvens av waypoints via Nav2 NavigateToPose."""
 
 import rclpy
 from rclpy.node import Node

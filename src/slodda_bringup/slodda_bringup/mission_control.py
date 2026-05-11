@@ -28,7 +28,7 @@ from std_msgs.msg import String
 from vision_msgs.msg import Detection2DArray
 from sensor_msgs.msg import LaserScan
 
-# ── Tracking P-controller ─────────────────────────────────────────────────────
+# Tracking P-controller
 KP_ANG             = 0.005
 MAX_ANG            = 0.6
 PIXEL_ALIGN_PX     = 20
@@ -51,17 +51,17 @@ DETECT_TIMEOUT_S   = 0.5
 LOST_TIMEOUT_S     = 8.0
 SEARCH_ANG_VEL     = 0.4
 
-# ── YOLO auto-trigger ─────────────────────────────────────────────────────────
+# YOLO auto-trigger
 STREAK_REQ         = 3
 
-# ── Nav2 cancel hold ──────────────────────────────────────────────────────────
+# Nav2 cancel hold
 CANCEL_HOLD_TICKS  = 15   # 1.5 s — gives Nav2 controller time to stop publishing
 
-# ── Path recording ────────────────────────────────────────────────────────────
+# Path recording
 PATH_STEP_M        = 0.05
 PATH_MAX_LEN       = 500
 
-# ── Return-home controller ────────────────────────────────────────────────────
+# Return-home controller
 RETURN_SPD         = 0.15
 RETURN_WP_M        = 0.06
 KP_ANG_RETURN      = 1.2
@@ -137,7 +137,7 @@ class MissionControl(Node):
         self.create_timer(0.1, self._tick)
         self.get_logger().info('MissionControl klar — sett 2D Nav2 Goal i RViz for å starte')
 
-    # ── YOLO gate helpers ─────────────────────────────────────────────────────
+    # YOLO gate helpers
 
     def _yolo_arm(self):
         """Enable YOLO auto-trigger. Call only when entering NAVIGATE."""
@@ -151,7 +151,7 @@ class MissionControl(Node):
         self._streak       = 0
         self.get_logger().info('YOLO → DISARMED')
 
-    # ── State transitions ─────────────────────────────────────────────────────
+    # State transitions
 
     def _set_state(self, new_state: str):
         old_state = self.state
@@ -172,7 +172,7 @@ class MissionControl(Node):
 
         self.state = new_state
 
-    # ── RViz 2D Nav2 Goal ─────────────────────────────────────────────────────
+    # RViz 2D Nav2 Goal
 
     def _goal_pose_cb(self, msg: PoseStamped):
         if self.state != self.IDLE:
@@ -186,7 +186,7 @@ class MissionControl(Node):
         self._yolo_arm()
         self._send_nav_goal()
 
-    # ── External commands ─────────────────────────────────────────────────────
+    # External commands
 
     def _cmd_cb(self, msg: String):
         cmd = msg.data.strip().upper()
@@ -216,7 +216,7 @@ class MissionControl(Node):
             self._pending_goal = None
             self._set_state(self.IDLE)
 
-    # ── YOLO detections ───────────────────────────────────────────────────────
+    # YOLO detections
 
     def _det_cb(self, msg: Detection2DArray):
         # RETURN_HOME: hard gate — ignore everything
@@ -256,7 +256,7 @@ class MissionControl(Node):
             self._cancel_ticks = 0
             self._set_state(self.CANCELING)
 
-    # ── Odometry ─────────────────────────────────────────────────────────────
+    # Odometry
 
     def _odom_cb(self, msg: Odometry):
         p = msg.pose.pose.position
@@ -278,7 +278,7 @@ class MissionControl(Node):
         if len(self._path) > PATH_MAX_LEN:
             self._path.pop(0)
 
-    # ── LiDAR ─────────────────────────────────────────────────────────────────
+    # LiDAR
 
     def _scan_cb(self, msg: LaserScan):
         self.last_scan = msg
@@ -297,7 +297,7 @@ class MissionControl(Node):
         ]
         self.distance_m = min(vals) if vals else float('inf')
 
-    # ── Main tick ─────────────────────────────────────────────────────────────
+    # Main tick
 
     def _tick(self):
         self.status_pub.publish(String(data=self.state))
@@ -310,7 +310,7 @@ class MissionControl(Node):
         }
         dispatch.get(self.state, lambda: None)()
 
-    # ── NAVIGATE ──────────────────────────────────────────────────────────────
+    # NAVIGATE
 
     def _send_nav_goal(self):
         if self._pending_goal is None:
@@ -365,7 +365,7 @@ class MissionControl(Node):
     def _tick_navigate(self):
         pass  # auto-trigger handled in _det_cb
 
-    # ── CANCELING ─────────────────────────────────────────────────────────────
+    # CANCELING
 
     def _tick_canceling(self):
         self._stop()
@@ -376,7 +376,7 @@ class MissionControl(Node):
         if self._cancel_ticks >= CANCEL_HOLD_TICKS:
             self._start_tracking()
 
-    # ── TRACK_BEAR ────────────────────────────────────────────────────────────
+    # TRACK_BEAR
 
     def _start_tracking(self):
         self._track_phase    = 'ROTATE'
@@ -452,7 +452,7 @@ class MissionControl(Node):
             self._stop()
             self._set_state(self.AT_BEAR)
 
-    # ── RETURN HOME ───────────────────────────────────────────────────────────
+    # RETURN HOME
 
     def _start_return_home(self):
         if not self._path:
@@ -493,7 +493,7 @@ class MissionControl(Node):
         linear  = -RETURN_SPD if abs(heading_err) < RETURN_ALIGN_RAD else 0.0
         self._pub_twist(linear, angular)
 
-    # ── Helpers ───────────────────────────────────────────────────────────────
+    # Helpers
 
     def _pub_twist(self, lin: float, ang: float):
         t = Twist()
