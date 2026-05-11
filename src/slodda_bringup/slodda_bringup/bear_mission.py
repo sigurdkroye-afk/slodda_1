@@ -131,7 +131,7 @@ class BearMission(Node):
         # ── YOLO verification ────────────────────────────────────────────────
         # Each entry: (ROS timestamp, confidence, Detection2D.bbox)
         self._yolo_recent       = deque(maxlen=5)
-        self._yolo_verify_count = 3
+        self._yolo_verify_count = 1
         self._yolo_verify_conf  = 0.40
 
         # ── Per-state timers / futures ───────────────────────────────────────
