@@ -55,6 +55,9 @@ class OdometryNode(Node):
         self._tf_bcast = TransformBroadcaster(self)
         self.create_subscription(
             Int32MultiArray, '/encoder_ticks', self._tick_cb, 10)
+        # Publish at 10 Hz even without encoder ticks so EKF and bear_mission
+        # always have a valid /odom (zero velocity when robot is stationary).
+        self.create_timer(0.1, self._timer_cb)
         self.get_logger().info('OdometryNode ready.')
 
     def _tick_cb(self, msg: Int32MultiArray):
@@ -125,6 +128,10 @@ class OdometryNode(Node):
         odom.twist.twist.angular.z = omega
         odom.twist.covariance = _TWIST_COV
         self._odom_pub.publish(odom)
+
+
+    def _timer_cb(self):
+        self._publish(self.get_clock().now(), v=0.0, omega=0.0)
 
 
 def _yaw_to_quat(yaw: float):
