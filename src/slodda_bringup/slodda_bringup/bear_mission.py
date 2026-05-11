@@ -177,7 +177,7 @@ class BearMission(Node):
             self._caching_path = True
             self._call_arm_async('drive')   # deploy arm to drive pos (fire-and-forget)
 
-            if self._bear_recently_seen(window_s=3.0):
+            if self._bear_recently_seen(window_s=30.0):
                 self.get_logger().info(
                     'Bamse allerede synlig ved start — hopper over Nav2, går rett til VERIFY_BEAR.'
                 )
@@ -281,6 +281,17 @@ class BearMission(Node):
                 handle.cancel_goal_async()
             return
         if not handle.accepted:
+            if self._bear_recently_seen(window_s=30.0):
+                self.get_logger().warn(
+                    'Nav2-mål avvist, men bamse nylig sett — går til VERIFY_BEAR.'
+                )
+                self._stop()
+                self._caching_path    = False
+                self._last_arm_status = ''
+                self._verify_t0       = self.get_clock().now()
+                self._verify_future   = self._call_arm_async('search')
+                self._set_state(self.VERIFY_BEAR)
+                return
             self.get_logger().warn('Nav2-mål avvist.')
             self._finish('FAILED_NAV')
             return

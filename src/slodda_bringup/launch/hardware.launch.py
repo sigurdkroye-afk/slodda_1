@@ -180,7 +180,7 @@ def generate_launch_description():
                 'behavior_server',
                 'bt_navigator',
             ],
-            'bond_timeout': 120.0,
+            'bond_timeout': 0.0,
             'bond.heartbeat_period': 1.0,
             'bond.heartbeat_timeout': 60.0,
             'attempt_respawn_reconnection': True,
