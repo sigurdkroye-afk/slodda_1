@@ -169,7 +169,8 @@ class BearMission(Node):
     def start_cb(self, msg: Bool):
         if msg.data and self.state == self.IDLE:
             if self._latest_odom is None:
-                self.get_logger().error('Ingen /odom mottatt ennå — kan ikke starte oppdrag.')
+                self.get_logger().warn('Ingen /odom ennå — venter 2s og prøver igjen...')
+                self.create_timer(2.0, lambda: self.start_cb(msg))
                 return
             self.get_logger().info('Oppdrag startet!')
             self._disable_tracker()
