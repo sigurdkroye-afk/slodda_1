@@ -170,7 +170,10 @@ class BearMission(Node):
         if msg.data and self.state == self.IDLE:
             if self._latest_odom is None:
                 self.get_logger().warn('Ingen /odom ennå — venter 2s og prøver igjen...')
-                self.create_timer(2.0, lambda: self.start_cb(msg))
+                def _retry():
+                    _t.cancel()
+                    self.start_cb(msg)
+                _t = self.create_timer(2.0, _retry)
                 return
             self.get_logger().info('Oppdrag startet!')
             self._disable_tracker()
