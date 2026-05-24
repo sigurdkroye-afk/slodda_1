@@ -472,13 +472,14 @@ class BearMission(Node):
 
         # APPROACH-fase: bjørn sentrert — kjør rett fram, IR-sensor griper ved 12cm
         if self._servo_approaching:
-            if dx_norm is not None and abs(dx_norm) > tol * 3:
-                self._servo_approaching = False   # driftet for langt — reverter til ALIGN
+            # Reverter kun til ALIGN hvis fersk data viser bjørn langt av senter
+            if dx_norm is not None and det_age_s < 2.0 and abs(dx_norm) > tol * 3:
+                self._servo_approaching = False
             else:
                 self._publish_twist(max_lin, 0.0)
                 return
 
-        # ALIGN-fase — ingen deteksjon: sveip-søk ±30°, avbryt etter 4s
+        # Ingen deteksjon i det hele tatt — sveip-søk ±30°, avbryt etter 4s
         if dx_norm is None:
             if self._lost_search_started is None:
                 self._lost_search_started = now
@@ -493,13 +494,17 @@ class BearMission(Node):
                 self._finish('FAILED_LOST_BEAR')
             return
 
-        # ALIGN-fase — roter til bjørn er sentrert, ingen fremoverfart
-        if abs(dx_norm) < tol:
-            self._servo_approaching = True
-            self._publish_twist(max_lin, 0.0)
+        # Fersk deteksjon (<2s): ALIGN — roter til bjørn er sentrert
+        if det_age_s < 2.0:
+            if abs(dx_norm) < tol:
+                self._servo_approaching = True
+                self._publish_twist(max_lin, 0.0)
+            else:
+                ang_z = clamp(-k_p * dx_norm, -max_ang, max_ang)
+                self._publish_twist(0.0, ang_z)
         else:
-            ang_z = clamp(-k_p * dx_norm, -max_ang, max_ang)
-            self._publish_twist(0.0, ang_z)
+            # Deteksjon gammel (2s–25s): kjør rett fram mot sist kjente retning
+            self._publish_twist(max_lin, 0.0)
 
     # RETURN_HOME
 

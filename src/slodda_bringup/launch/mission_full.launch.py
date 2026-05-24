@@ -21,7 +21,7 @@ def generate_launch_description():
         DeclareLaunchArgument('max_ang_servo',         default_value='0.5'),
         DeclareLaunchArgument('heading_tolerance',     default_value='0.10'),
         DeclareLaunchArgument('lost_timeout_s',        default_value='25.0'),
-        DeclareLaunchArgument('grab_timeout_s',        default_value='30.0'),
+        DeclareLaunchArgument('grab_timeout_s',        default_value='90.0'),
         DeclareLaunchArgument('replay_lin_speed',      default_value='0.10'),
         DeclareLaunchArgument('replay_xy_tol',         default_value='0.15'),
         DeclareLaunchArgument('replay_yaw_tol',        default_value='0.25'),
