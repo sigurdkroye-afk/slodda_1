@@ -141,6 +141,7 @@ class BearMission(Node):
         self._servo_t0              = None
         self._last_yolo_t           = None
         self._lost_search_started   = None
+        self._grab_grace_t0         = None
         self._replay_queue          = []
         self._replay_idx            = 0
         self._release_t0            = None
@@ -219,7 +220,7 @@ class BearMission(Node):
 
     def _on_arm_status(self, msg: String):
         self._last_arm_status = msg.data.strip()
-        if self._last_arm_status == 'GRABBED':
+        if self._last_arm_status in ('GRABBED', 'DONE:3'):
             self._arm_grabbed = True
 
     def _on_odom(self, msg: Odometry):
@@ -406,6 +407,7 @@ class BearMission(Node):
         if self._last_arm_status == 'DONE:2':
             self.get_logger().info('Arm i søk-posisjon (DONE:2) — starter VISUAL_SERVO.')
             self._arm_grabbed         = False
+            self._grab_grace_t0       = None
             self._servo_t0            = now
             self._last_yolo_t         = now
             self._lost_search_started = None
@@ -476,11 +478,20 @@ class BearMission(Node):
         lin_x = max_lin if abs(dx_norm) < tol else max_lin * 0.5
         self._publish_twist(lin_x, ang_z)
 
-        # Grab timeout: gå til SEARCH og prøv igjen
+        # Grab timeout: 5s grace-periode — ESP32 kan være treig å rapportere GRABBED
         if (now - self._servo_t0).nanoseconds * 1e-9 > self.get_parameter('grab_timeout_s').value:
-            self.get_logger().warn('GRABBED timeout — åpner arm, returnerer til SEARCH.')
-            self._stop()
+            if self._grab_grace_t0 is None:
+                self.get_logger().warn('GRABBED timeout — venter 5s på ESP32-bekreftelse.')
+                self._grab_grace_t0 = now
+                self._stop()
+                return
+            grace = (now - self._grab_grace_t0).nanoseconds * 1e-9
+            if grace < 5.0:
+                self._stop()
+                return
+            self.get_logger().warn('Grace-periode utløpt — åpner arm, returnerer til SEARCH.')
             self._call_arm_async('open')
+            self._grab_grace_t0 = None
             self.search_start = self.get_clock().now()
             self._set_state(self.SEARCH)
 
