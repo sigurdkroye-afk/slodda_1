@@ -142,6 +142,7 @@ class BearMission(Node):
         self._last_yolo_t           = None
         self._lost_search_started   = None
         self._grab_grace_t0         = None
+        self._servo_approaching     = False
         self._replay_queue          = []
         self._replay_idx            = 0
         self._release_t0            = None
@@ -411,6 +412,7 @@ class BearMission(Node):
             self._servo_t0            = now
             self._last_yolo_t         = now
             self._lost_search_started = None
+            self._servo_approaching   = False
             self._set_state(self.VISUAL_SERVO)
             return
 
@@ -432,36 +434,51 @@ class BearMission(Node):
             self._enter_return_home()
             return
 
-        lost_timeout  = self.get_parameter('lost_timeout_s').value
-        drive_stale_s = self.get_parameter('drive_stale_s').value
+        # Grab timeout med 5s grace for treg ESP32-bekreftelse
+        elapsed = (now - self._servo_t0).nanoseconds * 1e-9
+        if elapsed > self.get_parameter('grab_timeout_s').value:
+            if self._grab_grace_t0 is None:
+                self.get_logger().warn('GRABBED timeout — venter 5s på ESP32-bekreftelse.')
+                self._grab_grace_t0 = now
+            grace = (now - self._grab_grace_t0).nanoseconds * 1e-9
+            if grace < 5.0:
+                self._stop()
+            else:
+                self.get_logger().warn('Grace-periode utløpt — åpner arm, returnerer til SEARCH.')
+                self._call_arm_async('open')
+                self._grab_grace_t0  = None
+                self.search_start    = self.get_clock().now()
+                self._set_state(self.SEARCH)
+            return
 
-        # Sjekk ferskeste high-conf YOLO-deteksjon
-        dx_norm    = None
-        det_age_s  = float('inf')
-        if self._yolo_recent:
-            t, _score, bbox = self._yolo_recent[-1]
-            det_age_s = (now - t).nanoseconds * 1e-9
+        lost_timeout = self.get_parameter('lost_timeout_s').value
+
+        # Ferskeste deteksjon (conf≥0.15)
+        dx_norm   = None
+        det_age_s = float('inf')
+        if self.last_detection is not None and self.last_det_time is not None:
+            det_age_s = (now - self.last_det_time).nanoseconds * 1e-9
             if det_age_s <= lost_timeout:
                 W             = float(self.get_parameter('image_width').value)
                 target_offset = self.get_parameter('target_cx_offset_norm').value
-                cx_norm       = (bbox.center.position.x - W / 2.0) / (W / 2.0)
+                cx_norm       = (self.last_detection.bbox.center.position.x - W / 2.0) / (W / 2.0)
                 dx_norm       = cx_norm - target_offset
-                self._lost_search_started = None   # tilbakestill sveip
+                self._lost_search_started = None
 
-        # Deteksjon for gammel — hold kurs mot sist kjente posisjon, kjør sakte fram.
-        # IR-sensoren på armen avslutter grep når <12cm. Halv angular-gain hindrer
-        # oscillasjon på gammel data.
-        if dx_norm is not None and det_age_s > drive_stale_s:
-            k_p     = self.get_parameter('k_p_yaw').value
-            max_ang = self.get_parameter('max_ang_servo').value
-            max_lin = self.get_parameter('max_lin_servo').value
-            self._publish_twist(
-                max_lin * 0.5,
-                clamp(-k_p * dx_norm, -max_ang * 0.5, max_ang * 0.5),
-            )
-            return
+        k_p     = self.get_parameter('k_p_yaw').value
+        max_ang = self.get_parameter('max_ang_servo').value
+        max_lin = self.get_parameter('max_lin_servo').value
+        tol     = self.get_parameter('heading_tolerance').value
 
-        # Tap av bjørn: sveip-søk ±30° → abort
+        # APPROACH-fase: bjørn sentrert — kjør rett fram, IR-sensor griper ved 12cm
+        if self._servo_approaching:
+            if dx_norm is not None and abs(dx_norm) > tol * 3:
+                self._servo_approaching = False   # driftet for langt — reverter til ALIGN
+            else:
+                self._publish_twist(max_lin, 0.0)
+                return
+
+        # ALIGN-fase — ingen deteksjon: sveip-søk ±30°, avbryt etter 4s
         if dx_norm is None:
             if self._lost_search_started is None:
                 self._lost_search_started = now
@@ -476,32 +493,13 @@ class BearMission(Node):
                 self._finish('FAILED_LOST_BEAR')
             return
 
-        # P-kontroller: sentrér bjørn med offset (fersk deteksjon ≤ drive_stale_s)
-        k_p     = self.get_parameter('k_p_yaw').value
-        max_ang = self.get_parameter('max_ang_servo').value
-        max_lin = self.get_parameter('max_lin_servo').value
-        tol     = self.get_parameter('heading_tolerance').value
-
-        ang_z = clamp(-k_p * dx_norm, -max_ang, max_ang)
-        lin_x = max_lin if abs(dx_norm) < tol else max_lin * 0.5
-        self._publish_twist(lin_x, ang_z)
-
-        # Grab timeout: 5s grace-periode — ESP32 kan være treig å rapportere GRABBED
-        if (now - self._servo_t0).nanoseconds * 1e-9 > self.get_parameter('grab_timeout_s').value:
-            if self._grab_grace_t0 is None:
-                self.get_logger().warn('GRABBED timeout — venter 5s på ESP32-bekreftelse.')
-                self._grab_grace_t0 = now
-                self._stop()
-                return
-            grace = (now - self._grab_grace_t0).nanoseconds * 1e-9
-            if grace < 5.0:
-                self._stop()
-                return
-            self.get_logger().warn('Grace-periode utløpt — åpner arm, returnerer til SEARCH.')
-            self._call_arm_async('open')
-            self._grab_grace_t0 = None
-            self.search_start = self.get_clock().now()
-            self._set_state(self.SEARCH)
+        # ALIGN-fase — roter til bjørn er sentrert, ingen fremoverfart
+        if abs(dx_norm) < tol:
+            self._servo_approaching = True
+            self._publish_twist(max_lin, 0.0)
+        else:
+            ang_z = clamp(-k_p * dx_norm, -max_ang, max_ang)
+            self._publish_twist(0.0, ang_z)
 
     # RETURN_HOME
 

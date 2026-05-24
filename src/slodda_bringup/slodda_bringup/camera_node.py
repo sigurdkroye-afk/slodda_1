@@ -25,8 +25,8 @@ class CameraNode(Node):
         time.sleep(2)
 
         threading.Thread(target=self._capture_loop, daemon=True).start()
-        self.get_logger().info('Camera ready — publishing on /camera/image_raw at 5 Hz')
-        self.create_timer(0.2, self._publish)
+        self.get_logger().info('Camera ready — publishing on /camera/image_raw at 10 Hz')
+        self.create_timer(0.1, self._publish)
 
     def _capture_loop(self):
         while True:
@@ -34,7 +34,7 @@ class CameraNode(Node):
             bgr = cv2.cvtColor(raw, cv2.COLOR_BGRA2BGR)
             with self._lock:
                 self._frame = bgr
-            time.sleep(0.2)
+            time.sleep(0.1)
 
     def _publish(self):
         with self._lock:

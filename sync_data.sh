@@ -12,4 +12,10 @@ cp -v src/${PKG}/config/*.rviz     "${SHARE}/config/"
 cp -v src/${PKG}/behavior_trees/*.xml "${SHARE}/behavior_trees/"
 cp -v src/${PKG}/scripts/*.py      "${SHARE}/scripts/" 2>/dev/null || true
 
+# Python module sources (only needed with regular colcon build, not --symlink-install)
+PYSITE="install/${PKG}/lib/python3.12/site-packages/${PKG}"
+if [ -d "${PYSITE}" ]; then
+    cp -v src/${PKG}/${PKG}/*.py "${PYSITE}/"
+fi
+
 echo "Sync done."
