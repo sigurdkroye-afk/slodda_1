@@ -1,7 +1,7 @@
 ekf_filter_node:
   ros__parameters:
-    frequency: 8.0
-    sensor_timeout: 0.5
+    frequency: 1.0
+    sensor_timeout: 1.0
     two_d_mode: true
     transform_timeout: 0.3
     publish_tf: true
