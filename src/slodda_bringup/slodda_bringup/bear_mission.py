@@ -80,7 +80,7 @@ class BearMission(Node):
         self.declare_parameter('max_lin_servo', 0.05)
         self.declare_parameter('max_ang_servo', 0.5)
         self.declare_parameter('heading_tolerance', 0.10)
-        self.declare_parameter('lost_timeout_s', 15.0)
+        self.declare_parameter('lost_timeout_s', 25.0)
         self.declare_parameter('drive_stale_s',  3.0)   # stop driving if detection older than this
         self.declare_parameter('grab_timeout_s', 60.0)
 
@@ -448,9 +448,17 @@ class BearMission(Node):
                 dx_norm       = cx_norm - target_offset
                 self._lost_search_started = None   # tilbakestill sveip
 
-        # Deteksjon for gammel — stopp og vent på neste YOLO-frame
+        # Deteksjon for gammel — hold kurs mot sist kjente posisjon, kjør sakte fram.
+        # IR-sensoren på armen avslutter grep når <12cm. Halv angular-gain hindrer
+        # oscillasjon på gammel data.
         if dx_norm is not None and det_age_s > drive_stale_s:
-            self._publish_twist(0.0, 0.0)
+            k_p     = self.get_parameter('k_p_yaw').value
+            max_ang = self.get_parameter('max_ang_servo').value
+            max_lin = self.get_parameter('max_lin_servo').value
+            self._publish_twist(
+                max_lin * 0.5,
+                clamp(-k_p * dx_norm, -max_ang * 0.5, max_ang * 0.5),
+            )
             return
 
         # Tap av bjørn: sveip-søk ±30° → abort
