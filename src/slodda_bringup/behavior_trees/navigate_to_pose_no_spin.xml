@@ -1,7 +1,8 @@
 <!--
-  Nav2 Kilted BT — stabil versjon for tracked robot med noisy IMU.
-  Spin-recovery fjernet: med BNO085 I2C-feil er Spin-yaw upålitelig.
-  Recovery: BackUp 0.25m → ClearLocalCostmap → Wait
+  Nav2 Kilted BT — tracked robot, no spin, no Wait/BackUp recovery.
+  I Kilted eksponerer behavior_server actions under /behavior_server/wait
+  (ikke /wait), så Wait-noder i BT-treet feiler oppslag. Siden oppdraget
+  er kortdistanse (~1m) er costmap-clearing tilstrekkelig som recovery.
 -->
 <root BTCPP_format="4" main_tree_to_execute="MainTree">
   <BehaviorTree ID="MainTree">
@@ -36,17 +37,7 @@
         </Fallback>
         <ReactiveFallback name="RecoveryFallback">
           <GoalUpdated/>
-          <RoundRobin name="RecoveryActions">
-            <Sequence name="ClearingActions">
-              <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
-            </Sequence>
-            <Sequence name="ClearThenBackUp">
-              <ClearEntireCostmap name="ClearLocalCostmap-PreBackUp" service_name="local_costmap/clear_entirely_local_costmap"/>
-              <Wait wait_duration="1.5" error_code_id="{wait_error_code}" error_msg="{wait_error_msg}" server_timeout="5000"/>
-              <BackUp backup_dist="0.20" backup_speed="0.08" error_code_id="{backup_error_code}" error_msg="{backup_error_msg}" server_timeout="6000"/>
-            </Sequence>
-            <Wait wait_duration="2.0" error_code_id="{wait_error_code}" error_msg="{wait_error_msg}" server_timeout="5000"/>
-          </RoundRobin>
+          <ClearEntireCostmap name="ClearLocalCostmap-Recovery" service_name="local_costmap/clear_entirely_local_costmap"/>
         </ReactiveFallback>
       </Sequence>
     </RecoveryNode>
