@@ -66,7 +66,7 @@ class BearMission(Node):
         # Original params
         self.declare_parameter('goal_x', 1.0)
         self.declare_parameter('goal_y', 0.0)
-        self.declare_parameter('search_timeout', 30.0)
+        self.declare_parameter('search_timeout', 45.0)
         self.declare_parameter('approach_fwd_speed', 0.15)
         self.declare_parameter('approach_k_ang', 0.005)
         self.declare_parameter('bbox_area_threshold', 0.15)
@@ -362,8 +362,21 @@ class BearMission(Node):
             self._finish('FAILED_SEARCH_TIMEOUT')
             return
 
-        if self._yolo_verified():
-            self.get_logger().info('Bamse verifisert under SEARCH — går til VERIFY_BEAR.')
+        if self.last_det_time is None:
+            elapsed_search = (self.get_clock().now() - self.search_start).nanoseconds * 1e-9
+            if elapsed_search > 5.0:
+                self.get_logger().warn(
+                    'SEARCH: ingen YOLO-deteksjoner ennå — sjekk at yolo_detector kjører!',
+                    throttle_duration_sec=10.0,
+                )
+
+        high_conf = self._yolo_verified()
+        low_conf  = self._bear_recently_seen(window_s=3.0)
+        if high_conf or low_conf:
+            reason = 'high-conf' if high_conf else 'low-conf'
+            self.get_logger().info(
+                f'Bamse sett under SEARCH ({reason}) — går til VERIFY_BEAR.'
+            )
             self._stop()
             self._caching_path    = False
             self._last_arm_status = ''
