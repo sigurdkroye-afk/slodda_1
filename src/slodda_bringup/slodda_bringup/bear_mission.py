@@ -97,6 +97,7 @@ class BearMission(Node):
         self._nav_handle        = None
         self._cancel_ticks      = 0
         self._navigate_t0       = None
+        self._goal_pose         = None   # PoseStamped from /goal_pose (RViz)
 
         # LiDAR
         self.last_scan      = None
@@ -158,6 +159,7 @@ class BearMission(Node):
         self.create_subscription(LaserScan,        '/scan',               self._scan_cb,       10)
         self.create_subscription(String,           '/arm/status',         self._on_arm_status, 10)
         self.create_subscription(Odometry,         '/odom',               self._on_odom,       10)
+        self.create_subscription(PoseStamped,      '/goal_pose',          self._goal_pose_cb,  10)
 
         # Publishers
         self.cmd_pub    = self.create_publisher(Twist,  '/cmd_vel',             10)
@@ -198,6 +200,27 @@ class BearMission(Node):
 
             self._set_state(self.NAVIGATE)
             self._send_nav_goal()
+
+    def _goal_pose_cb(self, msg: PoseStamped):
+        if self.state != self.IDLE:
+            return
+        if self._latest_odom is None:
+            self.get_logger().warn('Ingen /odom ennå — venter 2s og prøver igjen...')
+            def _retry():
+                _t.cancel()
+                self._goal_pose_cb(msg)
+            _t = self.create_timer(2.0, _retry)
+            return
+        self.get_logger().info(
+            f'Goal mottatt fra RViz: ({msg.pose.position.x:.2f}, {msg.pose.position.y:.2f})')
+        self._goal_pose = msg
+        self._disable_tracker()
+        self._start_pose = self._odom_to_tuple(self._latest_odom)
+        self._path_buffer.clear()
+        self._caching_path = True
+        self._call_arm_async('drive')
+        self._set_state(self.NAVIGATE)
+        self._send_nav_goal()
 
     def det_cb(self, msg: Detection2DArray):
         """Update last_detection (class 77, conf≥0.15) and YOLO verify deque (conf≥0.40)."""
@@ -273,20 +296,27 @@ class BearMission(Node):
 
     def _send_nav_goal(self):
         self._navigate_t0 = self.get_clock().now()
-        goal_x = self.get_parameter('goal_x').value
-        goal_y = self.get_parameter('goal_y').value
-        self.get_logger().info(f'Navigerer til ({goal_x}, {goal_y})...')
         if not self._nav_client.wait_for_server(timeout_sec=10.0):
             self.get_logger().error('Nav2 ikke tilgjengelig — avbryter.')
             self._finish('FAILED_NAV_SERVER')
             return
         goal = NavigateToPose.Goal()
-        goal.pose = PoseStamped()
-        goal.pose.header.frame_id = 'map'
-        goal.pose.header.stamp    = self.get_clock().now().to_msg()
-        goal.pose.pose.position.x = goal_x
-        goal.pose.pose.position.y = goal_y
-        goal.pose.pose.orientation.w = 1.0
+        if self._goal_pose is not None:
+            goal.pose = self._goal_pose
+            goal.pose.header.stamp = self.get_clock().now().to_msg()
+            self.get_logger().info(
+                f'Navigerer til RViz-mål ({goal.pose.pose.position.x:.2f}, '
+                f'{goal.pose.pose.position.y:.2f})...')
+        else:
+            goal_x = self.get_parameter('goal_x').value
+            goal_y = self.get_parameter('goal_y').value
+            self.get_logger().info(f'Navigerer til param-mål ({goal_x}, {goal_y})...')
+            goal.pose = PoseStamped()
+            goal.pose.header.frame_id = 'map'
+            goal.pose.header.stamp    = self.get_clock().now().to_msg()
+            goal.pose.pose.position.x = goal_x
+            goal.pose.pose.position.y = goal_y
+            goal.pose.pose.orientation.w = 1.0
         future = self._nav_client.send_goal_async(goal)
         future.add_done_callback(self._nav_goal_cb)
 
@@ -615,6 +645,7 @@ class BearMission(Node):
     def _finish(self, status):
         self._stop()
         self._caching_path = False
+        self._goal_pose    = None
         self.track_pub.publish(Bool(data=True))
         self._set_state(self.DONE)
         self.status_pub.publish(String(data=status))
