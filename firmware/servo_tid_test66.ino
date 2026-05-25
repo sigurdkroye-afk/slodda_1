@@ -230,7 +230,7 @@ void setup() {
   Serial.begin(115200);
   Serial2.begin(115200, SERIAL_8N1, UART2_RX_PIN, UART2_TX_PIN);
   Serial2.println("ARM_READY");
-  Serial.println("Serial2 aktiv: RX=GPIO13, TX=GPIO17");
+  Serial.println("Serial2 aktiv: RX=GPIO4, TX=GPIO5");
   delay(500);
 
   pinMode(SERVO1_PIN, OUTPUT);
