@@ -149,6 +149,7 @@ class BearMission(Node):
         self._replay_idx            = 0
         self._release_t0            = None
         self._release_future        = None
+        self._yolo_warn_sent        = False
 
         # Nav2 action client
         self._nav_client = ActionClient(self, NavigateToPose, 'navigate_to_pose')
@@ -404,16 +405,16 @@ class BearMission(Node):
     def _tick_search(self):
         timeout = self.get_parameter('search_timeout').value
         if self.search_start and (self.get_clock().now() - self.search_start).nanoseconds > timeout * 1e9:
-            self.get_logger().warn('Søk timeout — ingen teddybjørn funnet.')
+            self.get_logger().info('Søk timeout — ingen teddybjørn funnet.')
             self._finish('FAILED_SEARCH_TIMEOUT')
             return
 
         if self.last_det_time is None:
             elapsed_search = (self.get_clock().now() - self.search_start).nanoseconds * 1e-9
-            if elapsed_search > 5.0:
+            if elapsed_search > 5.0 and not self._yolo_warn_sent:
+                self._yolo_warn_sent = True
                 self.get_logger().warn(
-                    'SEARCH: ingen YOLO-deteksjoner ennå — sjekk at yolo_detector kjører!',
-                    throttle_duration_sec=10.0,
+                    'SEARCH: ingen YOLO-deteksjoner ennå — sjekk at yolo_detector kjører!'
                 )
 
         high_conf = self._yolo_verified()
@@ -650,6 +651,8 @@ class BearMission(Node):
 
     def _set_state(self, state):
         self.get_logger().info(f'State: {self.state} → {state}')
+        if state == self.SEARCH:
+            self._yolo_warn_sent = False
         self.state = state
 
     def _stop(self):
