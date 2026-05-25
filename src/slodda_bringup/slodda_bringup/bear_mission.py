@@ -58,7 +58,7 @@ class BearMission(Node):
 
     # Ticks (à 100 ms) to hold zero-velocity after canceling Nav2 goal before
     # publishing our own cmd_vel — ensures Nav2's controller_server has stopped.
-    CANCEL_HOLD_TICKS = 4
+    CANCEL_HOLD_TICKS = 15
 
     def __init__(self):
         super().__init__('bear_mission')
@@ -96,6 +96,7 @@ class BearMission(Node):
         self.search_start       = None
         self._nav_handle        = None
         self._cancel_ticks      = 0
+        self._navigate_t0       = None
 
         # LiDAR
         self.last_scan      = None
@@ -251,8 +252,15 @@ class BearMission(Node):
     # NAVIGATE
 
     def _tick_navigate(self):
+        if (self._navigate_t0 is not None and
+                (self.get_clock().now() - self._navigate_t0).nanoseconds * 1e-9 > 120.0):
+            self.get_logger().warn('Nav2 navigate timeout (120s) — avbryter.')
+            self._cancel_nav_goal()
+            self._finish('FAILED_NAV_TIMEOUT')
+            return
+
         high_conf = self._yolo_verified()
-        low_conf  = self._bear_recently_seen(window_s=1.0)
+        low_conf  = self._bear_recently_seen(window_s=3.0)
         if high_conf or low_conf:
             reason = 'high-conf' if high_conf else 'low-conf'
             self.get_logger().info(
@@ -264,6 +272,7 @@ class BearMission(Node):
             self._set_state(self.CANCELING)
 
     def _send_nav_goal(self):
+        self._navigate_t0 = self.get_clock().now()
         goal_x = self.get_parameter('goal_x').value
         goal_y = self.get_parameter('goal_y').value
         self.get_logger().info(f'Navigerer til ({goal_x}, {goal_y})...')
@@ -742,7 +751,7 @@ class BearMission(Node):
             return False
         now    = self.get_clock().now()
         last_n = list(self._yolo_recent)[-self._yolo_verify_count:]
-        return (now - last_n[0][0]).nanoseconds * 1e-9 < 1.5
+        return (now - last_n[0][0]).nanoseconds * 1e-9 < 5.0
 
     def _bear_recently_seen(self, window_s: float = 3.0) -> bool:
         """True hvis siste class-77 deteksjon (conf>=0.15) er nyere enn window_s."""
