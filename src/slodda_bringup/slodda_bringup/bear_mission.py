@@ -355,6 +355,22 @@ class BearMission(Node):
             self.search_start = self.get_clock().now()
             return
 
+        # CANCELED (2): RViz nav dialog may have preempted our goal.
+        # If robot reached the goal area anyway, proceed to SEARCH.
+        # Otherwise re-send our goal (the RViz duplicate has finished).
+        if status == 2:
+            if self._near_goal(tolerance=0.5):
+                self.get_logger().info(
+                    'Nav2 CANCELED, men robot er nær målet — starter søk.')
+                self._caching_path = False
+                self._set_state(self.SEARCH)
+                self.search_start = self.get_clock().now()
+                return
+            self.get_logger().warn(
+                'Nav2 CANCELED (trolig RViz-duplikat) — sender goal på nytt.')
+            self._send_nav_goal()
+            return
+
         if self._bear_recently_seen(window_s=3.0):
             self.get_logger().warn(
                 f'Nav2 feilet (status={status}), men bamse nylig sett — '
@@ -796,6 +812,19 @@ class BearMission(Node):
         now    = self.get_clock().now()
         last_n = list(self._yolo_recent)[-self._yolo_verify_count:]
         return (now - last_n[0][0]).nanoseconds * 1e-9 < 5.0
+
+    def _near_goal(self, tolerance: float = 0.5) -> bool:
+        """True if robot's current position is within tolerance of the nav goal."""
+        if self._latest_odom is None:
+            return False
+        cur = self._odom_to_tuple(self._latest_odom)
+        if self._goal_pose is not None:
+            gx = self._goal_pose.pose.position.x
+            gy = self._goal_pose.pose.position.y
+        else:
+            gx = self.get_parameter('goal_x').value
+            gy = self.get_parameter('goal_y').value
+        return math.hypot(cur[0] - gx, cur[1] - gy) < tolerance
 
     def _bear_recently_seen(self, window_s: float = 3.0) -> bool:
         """True hvis siste class-77 deteksjon (conf>=0.15) er nyere enn window_s."""
