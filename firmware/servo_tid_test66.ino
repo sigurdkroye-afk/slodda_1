@@ -25,12 +25,12 @@ const int FART_INN = 1650;
 const int FART_UT  = 1350;
 
 const int STEG_MS         = 1000;
-const int KOMPENSASJON_MS = 150;
+const int KOMPENSASJON_MS = 100;
 
 // ============================================================
 // IR-SENSOR KONFIGURASJON
 // ============================================================
-const int IR_TERSKEL = 2100;  // ~12 cm — juster etter kalibrering
+const int IR_TERSKEL = 1700;  // ~12 cm
 
 const unsigned long IR_FORSINKELSE = 750;
 
@@ -189,7 +189,6 @@ void gaTilPosisjon(int malNr) {
       diff3 = 0;
     }
 
-    // Nødstopp via Serial2 (Pi) under pågående bevegelse
     if (Serial2.available() > 0 && Serial2.peek() == 'q') {
       Serial2.read();
       Serial.println("STOPPET");
@@ -254,7 +253,7 @@ void setup() {
   Serial.println("=================================");
   Serial.println("  TIDSBASERT SERVOKONTROLL v66");
   Serial.println("=================================");
-  Serial.println("  Kommandoer kun via Pi (Serial2)");
+  Serial.println("  Kommandoer via Pi (Serial2)");
   Serial.println("  Serial = output-only (debug)");
   Serial.println("  0-5     -> Gå til posisjon");
   Serial.println("  t/g/y/h/u/j -> Servo-steg");
@@ -298,8 +297,8 @@ void loop() {
     }
   }
 
-  // Alle kommandoer kun via Serial2 (Pi).
-  // Serial (USB) er output-only — løser floating RX-problem uten USB tilkoblet.
+  // Kommandoer fra Pi via Serial2
+  // Serial (USB) er output-only
   if (Serial2.available() > 0) {
     char k = Serial2.read();
     switch (k) {
@@ -343,7 +342,6 @@ void loop() {
         irAktiv = false;
         irDetektert = false;
         Serial.println("=> Nødstopp!");
-        Serial.println("STOPPED");
         Serial2.println("STOPPED");
         break;
     }
