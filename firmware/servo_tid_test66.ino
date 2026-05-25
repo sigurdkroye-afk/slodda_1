@@ -14,8 +14,8 @@ const int IR_HOYRE   = 34;
 // ============================================================
 // PI UART-KOMMUNIKASJON
 // ============================================================
-const int UART2_RX_PIN = 13;  // Pi GPIO14 → ESP32 GPIO13 (GPIO16 er ustabil, unngå)
-const int UART2_TX_PIN = 17;  // Pi GPIO15 ← ESP32 GPIO17
+const int UART2_RX_PIN = 4;   // Pi GPIO14 (pin8) → ESP32 GPIO4
+const int UART2_TX_PIN = 5;   // Pi GPIO15 (pin10) ← ESP32 GPIO5
 
 // ============================================================
 // SERVOKONFIGURASJON
