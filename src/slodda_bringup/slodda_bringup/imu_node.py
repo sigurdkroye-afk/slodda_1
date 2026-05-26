@@ -2,18 +2,20 @@
 """
 BNO055 IMU node — publishes sensor_msgs/Imu on /imu/data.
 
-Requires Adafruit_BNO055 on the Raspberry Pi:
-  pip install Adafruit_BNO055
+Requires adafruit-circuitpython-bno055 on the Raspberry Pi:
+  pip install adafruit-circuitpython-bno055 adafruit-blinka
 
 Uses hardware I2C bus 1 (GPIO 2/3). Requires in /boot/firmware/config.txt:
-  dtparam=i2c_arm=on,i2c_arm_baudrate=400000
+  dtparam=i2c_arm=on
 """
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Imu
 
 try:
-    from Adafruit_BNO055 import BNO055
+    import board
+    import busio
+    import adafruit_bno055
     _HW_AVAILABLE = True
 except ImportError:
     _HW_AVAILABLE = False
@@ -41,15 +43,18 @@ class ImuNode(Node):
 
         if not _HW_AVAILABLE:
             self.get_logger().error(
-                'Adafruit_BNO055 not installed — pip install Adafruit_BNO055')
+                'adafruit-circuitpython-bno055 not installed — '
+                'pip install adafruit-circuitpython-bno055')
         else:
-            addr = self.get_parameter('i2c_address').value
-            self._bno = BNO055.BNO055(rst=None, busnum=1, address=addr)
-            if not self._bno.begin():
-                self.get_logger().error('BNO055 init failed — sjekk kobling og adresse')
-                self._bno = None
-            else:
+            try:
+                i2c = busio.I2C(board.SCL, board.SDA)
+                addr = self.get_parameter('i2c_address').value
+                self._bno = adafruit_bno055.BNO055_I2C(i2c, address=addr)
                 self.get_logger().info('BNO055 initialisert OK.')
+            except Exception as e:
+                self.get_logger().error(
+                    f'BNO055 init failed — sjekk kobling og adresse: {e}')
+                self._bno = None
 
         hz = self.get_parameter('publish_hz').value
         self.create_timer(1.0 / hz, self._tick)
@@ -59,12 +64,12 @@ class ImuNode(Node):
         if self._bno is None:
             return
         try:
-            q = self._bno.read_quaternion()  # (w, x, y, z)
+            q = self._bno.quaternion  # (w, x, y, z)
             if q is None or None in q:
                 return
 
-            g = self._bno.read_gyroscope()            # (x, y, z) rad/s
-            a = self._bno.read_linear_acceleration()  # (x, y, z) m/s²
+            g = self._bno.gyro                  # (x, y, z) rad/s
+            a = self._bno.linear_acceleration   # (x, y, z) m/s²
 
             w, qx, qy, qz = q
             gx, gy, gz = g if g is not None else (0.0, 0.0, 0.0)
