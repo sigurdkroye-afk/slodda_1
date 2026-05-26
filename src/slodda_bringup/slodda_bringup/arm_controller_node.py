@@ -36,14 +36,6 @@ class ArmControllerNode(Node):
         self._running = True
         threading.Thread(target=self._reader_loop, daemon=True).start()
 
-        if self._ser is not None:
-            self.get_logger().info('Hjem arm til posisjon 0...')
-            self._ser.write(b'0')
-            if self._done[0].wait(timeout=10.0):
-                self.get_logger().info('Arm i posisjon 0.')
-            else:
-                self.get_logger().warn('Hjem-timeout — fortsetter uansett.')
-
         self.create_service(Trigger, '/arm/open',   self._svc_open)
         self.create_service(Trigger, '/arm/drive',  self._svc_drive)
         self.create_service(Trigger, '/arm/search', self._svc_search)
